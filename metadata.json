@@ -1,0 +1,6 @@
+{
+  "name": "HESU ICT Performance & Reporting Management System",
+  "description": "Enterprise ICT Performance & Reporting Management System for HESU Investment Ltd to record daily work, IT support tickets, SAP & business systems, KPI tracking, evidence storage, and generate real PowerPoint and PDF monthly reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

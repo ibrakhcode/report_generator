@@ -1,0 +1,313 @@
+'use client';
+
+import React, { useState } from 'react';
+import { Layers, Plus, CheckSquare, Clock, Calendar, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { ProjectImprovement, ProjectMilestone } from '../../types';
+import { storage } from '../../services/storage';
+import { notify } from '@/lib/systemNotify';
+
+export const ProjectsView: React.FC = () => {
+  const [projects, setProjects] = useState<ProjectImprovement[]>(() => storage.getProjects());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const users = storage.getCompanyUsers().filter((user) => user.active !== false);
+  const [formData, setFormData] = useState<Partial<ProjectImprovement>>({
+    name: '',
+    objective: '',
+    businessJustification: '',
+    startDate: new Date().toISOString().split('T')[0],
+    targetCompletionDate: '2026-11-30',
+    owner: users[0]?.fullName || '',
+    assignedUserId: users[0]?.id || '',
+    assignedUserName: users[0]?.fullName || '',
+    myResponsibilities: '',
+    status: 'Active',
+    milestones: [
+      { id: 'M-1', title: 'Architecture design & prerequisites', targetDate: '2026-10-25', status: 'Completed', weightPercent: 30 },
+      { id: 'M-2', title: 'Implementation and system testing', targetDate: '2026-11-10', status: 'In Progress', weightPercent: 40 },
+      { id: 'M-3', title: 'Documentation & final handover', targetDate: '2026-11-30', status: 'Pending', weightPercent: 30 }
+    ],
+    risksAndDependencies: '',
+    benefitsAndOutcomes: '',
+    approvalStatus: 'Approved',
+    evidenceFiles: []
+  });
+
+  const handleToggleMilestone = (project: ProjectImprovement, milestoneId: string) => {
+    const updatedMilestones = project.milestones.map((m) => {
+      if (m.id === milestoneId) {
+        const nextStatus = m.status === 'Completed' ? 'In Progress' : 'Completed';
+        return {
+          ...m,
+          status: nextStatus as ProjectMilestone['status'],
+          completedDate: nextStatus === 'Completed' ? new Date().toISOString().split('T')[0] : undefined
+        };
+      }
+      return m;
+    });
+
+    const updatedProject = { ...project, milestones: updatedMilestones };
+    storage.saveProject(updatedProject);
+    setProjects(storage.getProjects());
+  };
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name) return;
+
+    const toSave: ProjectImprovement = {
+      id: formData.id || `PRJ-2026-${String(projects.length + 1).padStart(3, '0')}`,
+      name: formData.name || '',
+      objective: formData.objective || '',
+      businessJustification: formData.businessJustification || '',
+      startDate: formData.startDate || new Date().toISOString().split('T')[0],
+      targetCompletionDate: formData.targetCompletionDate || '',
+      owner: formData.assignedUserName || formData.owner || '',
+      assignedUserId: formData.assignedUserId || '',
+      assignedUserName: formData.assignedUserName || formData.owner || '',
+      myResponsibilities: formData.myResponsibilities || '',
+      status: formData.status || 'Active',
+      milestones: formData.milestones || [],
+      progressPercent: 0,
+      risksAndDependencies: formData.risksAndDependencies || '',
+      benefitsAndOutcomes: formData.benefitsAndOutcomes || '',
+      approvalStatus: formData.approvalStatus || 'Approved',
+      evidenceFiles: formData.evidenceFiles || [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    storage.saveProject(toSave);
+    setProjects(storage.getProjects());
+    setIsModalOpen(false);
+    notify.success('Project saved', `${toSave.name} is in place.`);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <span>Projects & Continuous Improvements</span>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-teal-400 font-mono border border-slate-700">
+              {projects.length} strategic initiatives
+            </span>
+          </h2>
+          <p className="text-xs text-slate-400 mt-1">
+            Track disaster recovery readiness, server room modernization, and enterprise biometrics with milestone weighting.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-teal-600/20 flex items-center gap-1.5"
+        >
+          <Plus className="w-4 h-4" />
+          <span>New Project Initiative</span>
+        </button>
+      </div>
+
+      {projects.length === 0 ? (
+        <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
+          <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto text-xl">
+            🚀
+          </div>
+          <h3 className="text-base font-bold text-white">No Project Initiatives Yet</h3>
+          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+            Record continuous improvements, IT infrastructure upgrades, disaster recovery tests, or ERP enhancements with weighted milestone tracking.
+          </p>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-lg shadow-teal-600/20"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add First Project</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {projects.map((proj) => (
+          <div
+            key={proj.id}
+            className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4 shadow-lg"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs font-bold text-teal-400">{proj.id}</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-teal-500/10 text-teal-300 font-semibold border border-teal-500/20">
+                    {proj.status}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Target: {proj.targetCompletionDate}
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white mt-1.5">{proj.name}</h3>
+                <p className="text-xs text-slate-300 mt-1">{proj.objective}</p>
+              </div>
+
+              <div className="text-right sm:shrink-0">
+                <div className="text-2xl font-black text-teal-400 font-mono">
+                  {proj.progressPercent}%
+                </div>
+                <div className="text-[11px] text-slate-400">Milestone Progress</div>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-2 w-full bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-teal-500 to-emerald-400 transition-all duration-300"
+                style={{ width: `${proj.progressPercent}%` }}
+              />
+            </div>
+
+            {/* Milestones list with interactive toggle */}
+            <div className="space-y-2 pt-2 border-t border-slate-700/60">
+              <div className="text-xs font-bold text-slate-300">Deliverables & Milestones:</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {proj.milestones?.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => handleToggleMilestone(proj, m.id)}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900 border border-slate-800 text-left transition-colors text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`w-4 h-4 rounded flex items-center justify-center border ${
+                          m.status === 'Completed'
+                            ? 'bg-teal-500 border-teal-400 text-slate-950 font-bold'
+                            : 'border-slate-600 bg-slate-800'
+                        }`}
+                      >
+                        {m.status === 'Completed' && '✓'}
+                      </div>
+                      <span className={`font-medium ${m.status === 'Completed' ? 'text-slate-400 line-through' : 'text-slate-200'}`}>
+                        {m.title}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono shrink-0 ml-2">
+                      {m.weightPercent}%
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-700/60 gap-2">
+              <div>
+                Assigned to:{' '}
+                <span className="text-slate-200 font-medium">{proj.assignedUserName || proj.owner || 'Unassigned'}</span>
+              </div>
+              <div>Benefits: <span className="text-slate-300">{proj.benefitsAndOutcomes}</span></div>
+            </div>
+          </div>
+        ))}
+        </div>
+      )}
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 text-slate-100 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+              <h3 className="text-sm font-bold text-white">Create Project Initiative</h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSave} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Project Name</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g. Automated Offsite Cloud Disaster Recovery"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Objective</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.objective}
+                  onChange={(e) => setFormData({ ...formData, objective: e.target.value })}
+                  placeholder="e.g. Continuous log shipping and RTO reduction"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.startDate}
+                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Target Completion</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.targetCompletionDate}
+                    onChange={(e) => setFormData({ ...formData, targetCompletionDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Who will perform this project</label>
+                <select
+                  required
+                  value={formData.assignedUserId || ''}
+                  onChange={(e) => {
+                    const selected = users.find((user) => user.id === e.target.value);
+                    setFormData({
+                      ...formData,
+                      assignedUserId: e.target.value,
+                      assignedUserName: selected?.fullName || '',
+                      owner: selected?.fullName || ''
+                    });
+                  }}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
+                >
+                  <option value="">Select user</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.fullName} ({user.email})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-xl"
+                >
+                  Save Project
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

@@ -1,0 +1,386 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { AppSettings, EvidenceFile, TrainingRecord } from '@/types';
+import type { RmsSession } from '@/lib/rmsSession';
+import {
+  activityToRow,
+  assetRecordToRow,
+  auditToRow,
+  definitionToRow,
+  evidenceToRow,
+  issueToRow,
+  kpiToRow,
+  parseDataUrl,
+  projectToRow,
+  reportToRow,
+  rowToActivity,
+  rowToAssetRecord,
+  rowToAudit,
+  rowToDefinition,
+  rowToEvidence,
+  rowToIssue,
+  rowToKpi,
+  rowToProject,
+  rowToReport,
+  rowToSettings,
+  rowToTemplate,
+  rowToTicket,
+  rowToTraining,
+  rowToUser,
+  settingsToRow,
+  templateToRow,
+  ticketToRow,
+  trainingToRow,
+  userToRow,
+  type RmsCollection
+} from '@/lib/supabase/rmsMap';
+const SETTINGS_FALLBACK: AppSettings = {
+  companyName: '',
+  brandShortName: '',
+  department: 'Information Technology',
+  companyLogo: '',
+  headquarters: 'Dar es Salaam, Tanzania',
+  businessTimezone: 'Africa/Dar_es_Salaam',
+  defaultReportingPeriod: new Date().toISOString().slice(0, 7),
+  ticketDefaultSlaHours: 8,
+  companyRegistered: false,
+  activeCompanyId: '',
+  companyScopeReady: false,
+  uiTheme: 'light',
+  uiFont: 'jakarta',
+  autoSave: true,
+  idleTimeoutMinutes: 15,
+  emailService: {
+    enabled: true,
+    provider: 'Simulation',
+    fromEmail: '',
+    fromName: 'ICT Department',
+    apiKeyOrPass: '',
+    configured: false
+  },
+  whatsappService: {
+    enabled: true,
+    mode: 'NativeShare',
+    configured: true,
+    recipientPhone: ''
+  }
+};
+
+async function resolvedCompanyId(supabase: SupabaseClient, session: RmsSession): Promise<string | null> {
+  const { data } = await supabase.from('users').select('company_id').eq('id', session.userId).maybeSingle();
+  return (data?.company_id as string) || session.companyId || null;
+}
+
+async function replaceOwnerRows(
+  supabase: SupabaseClient,
+  table: string,
+  userId: string,
+  rows: Record<string, unknown>[]
+) {
+  const del = await supabase.from(table).delete().eq('owner_user_id', userId);
+  if (del.error) throw new Error(del.error.message);
+  if (!rows.length) return;
+  const ins = await supabase.from(table).insert(rows);
+  if (ins.error) throw new Error(ins.error.message);
+}
+
+async function uploadDataUrl(
+  supabase: SupabaseClient,
+  bucket: string,
+  path: string,
+  dataUrl: string
+): Promise<string | undefined> {
+  const parsed = parseDataUrl(dataUrl);
+  if (!parsed) return undefined;
+  const up = await supabase.storage.from(bucket).upload(path, parsed.bytes, {
+    contentType: parsed.mime,
+    upsert: true
+  });
+  if (up.error) return undefined;
+  return path;
+}
+
+async function withSignedFiles(
+  supabase: SupabaseClient,
+  training: ReturnType<typeof rowToTraining>[],
+  evidence: ReturnType<typeof rowToEvidence>[],
+  trainingRows: Record<string, unknown>[],
+  evidenceRows: Record<string, unknown>[]
+) {
+  const nextTraining = [...training];
+  for (let i = 0; i < trainingRows.length; i += 1) {
+    const path = String(trainingRows[i].signed_document_path || '');
+    if (!path) continue;
+    const signed = await supabase.storage.from('training-docs').createSignedUrl(path, 3600);
+    if (signed.data?.signedUrl) nextTraining[i].signedDocumentDataUrl = signed.data.signedUrl;
+  }
+  const nextEvidence = [...evidence];
+  for (let i = 0; i < evidenceRows.length; i += 1) {
+    const path = String(evidenceRows[i].storage_path || '');
+    if (!path) continue;
+    const signed = await supabase.storage.from('evidence').createSignedUrl(path, 3600);
+    if (signed.data?.signedUrl) nextEvidence[i].dataUrl = signed.data.signedUrl;
+  }
+  return { training: nextTraining, evidence: nextEvidence };
+}
+
+export async function readWorkspace(supabase: SupabaseClient, session: RmsSession) {
+  const owner = session.userId;
+  const companyId = await resolvedCompanyId(supabase, session);
+
+  const [
+    activities,
+    tickets,
+    issues,
+    projects,
+    kpis,
+    evidence,
+    training,
+    reports,
+    templates,
+    users,
+    audit,
+    definitions,
+    records,
+    settings
+  ] = await Promise.all([
+    supabase.from('daily_activities').select('*').eq('owner_user_id', owner),
+    supabase.from('tickets').select('*').eq('owner_user_id', owner),
+    supabase.from('system_issues').select('*').eq('owner_user_id', owner),
+    supabase.from('projects').select('*').eq('owner_user_id', owner),
+    supabase.from('kpis').select('*').eq('owner_user_id', owner),
+    supabase.from('evidence').select('*').eq('owner_user_id', owner),
+    supabase.from('training').select('*').eq('owner_user_id', owner),
+    supabase.from('monthly_reports').select('*').eq('owner_user_id', owner),
+    companyId
+      ? supabase.from('report_templates').select('*').or(`company_id.is.null,company_id.eq.${companyId}`)
+      : supabase.from('report_templates').select('*').is('company_id', null),
+    companyId
+      ? supabase.from('users').select('*').eq('company_id', companyId)
+      : supabase.from('users').select('*').eq('id', owner),
+    companyId
+      ? supabase.from('audit_logs').select('*').eq('company_id', companyId).order('timestamp', { ascending: false }).limit(500)
+      : supabase.from('audit_logs').select('*').limit(0),
+    supabase.from('asset_definitions').select('*'),
+    companyId
+      ? supabase.from('asset_records').select('*').or(`company_id.eq.${companyId},owner_user_id.eq.${owner},id.eq.${companyId}`)
+      : supabase.from('asset_records').select('*').eq('owner_user_id', owner),
+    companyId
+      ? supabase.from('company_settings').select('*').eq('company_id', companyId).maybeSingle()
+      : Promise.resolve({ data: null, error: null })
+  ]);
+
+  const firstError = [
+    activities,
+    tickets,
+    issues,
+    projects,
+    kpis,
+    evidence,
+    training,
+    reports,
+    templates,
+    users,
+    audit,
+    definitions,
+    records,
+    settings
+  ].find((result) => result.error);
+  if (firstError?.error) throw new Error(firstError.error.message);
+
+  const mappedTraining = (training.data || []).map((row) => rowToTraining(row as Record<string, unknown>));
+  const mappedEvidence = (evidence.data || []).map((row) => rowToEvidence(row as Record<string, unknown>));
+  const signed = await withSignedFiles(
+    supabase,
+    mappedTraining,
+    mappedEvidence,
+    (training.data || []) as Record<string, unknown>[],
+    (evidence.data || []) as Record<string, unknown>[]
+  );
+
+  return {
+    activities: (activities.data || []).map((row) => rowToActivity(row as Record<string, unknown>)),
+    tickets: (tickets.data || []).map((row) => rowToTicket(row as Record<string, unknown>)),
+    sapIssues: (issues.data || []).map((row) => rowToIssue(row as Record<string, unknown>)),
+    projects: (projects.data || []).map((row) => rowToProject(row as Record<string, unknown>)),
+    kpis: (kpis.data || []).map((row) => rowToKpi(row as Record<string, unknown>)),
+    evidence: signed.evidence,
+    training: signed.training,
+    reports: (reports.data || []).map((row) => rowToReport(row as Record<string, unknown>)),
+    templates: (templates.data || []).map((row) => rowToTemplate(row as Record<string, unknown>)),
+    users: (users.data || []).map((row) => rowToUser(row as Record<string, unknown>)),
+    audit: (audit.data || []).map((row) => rowToAudit(row as Record<string, unknown>)),
+    assetDefinitions: (definitions.data || []).map((row) => rowToDefinition(row as Record<string, unknown>)),
+    assetRecords: (records.data || []).map((row) => rowToAssetRecord(row as Record<string, unknown>)),
+    settings: settings.data
+      ? rowToSettings(settings.data as Record<string, unknown>, SETTINGS_FALLBACK)
+      : null
+  };
+}
+
+export async function writeCollection(
+  supabase: SupabaseClient,
+  session: RmsSession,
+  collection: RmsCollection,
+  items: unknown
+) {
+  const owner = session.userId;
+  const companyId = await resolvedCompanyId(supabase, session);
+
+  if (collection === 'users') {
+    const list = Array.isArray(items) ? items : [];
+    for (const item of list) {
+      const row = userToRow(item as Parameters<typeof userToRow>[0]);
+      if (row.company_id) {
+        const existing = await supabase.from('companies').select('id').eq('id', row.company_id).maybeSingle();
+        if (!existing.data) {
+          const ins = await supabase.from('companies').insert({
+            id: row.company_id,
+            name: row.company_id,
+            updated_at: new Date().toISOString()
+          });
+          if (ins.error) throw new Error(ins.error.message);
+        }
+      }
+      const { error } = await supabase.from('users').upsert(row, { onConflict: 'id' });
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
+  if (collection === 'settings') {
+    if (!companyId || !items || typeof items !== 'object') return;
+    const { error } = await supabase
+      .from('company_settings')
+      .upsert(settingsToRow(items as AppSettings, companyId), { onConflict: 'company_id' });
+    if (error) throw new Error(error.message);
+    return;
+  }
+
+  if (collection === 'templates') {
+    const list = Array.isArray(items) ? items : [];
+    if (companyId) {
+      const del = await supabase.from('report_templates').delete().eq('company_id', companyId);
+      if (del.error) throw new Error(del.error.message);
+    }
+    const rows = list.map((item) => templateToRow(item as Parameters<typeof templateToRow>[0], companyId));
+    if (rows.length) {
+      const { error } = await supabase.from('report_templates').upsert(rows, { onConflict: 'id' });
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
+  if (collection === 'assetDefinitions') {
+    const list = Array.isArray(items) ? items : [];
+    const rows = list.map((item) => definitionToRow(item as Parameters<typeof definitionToRow>[0]));
+    if (rows.length) {
+      const { error } = await supabase.from('asset_definitions').upsert(rows, { onConflict: 'id' });
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
+  if (collection === 'assetRecords') {
+    const list = Array.isArray(items) ? items : [];
+    for (const raw of list) {
+      const record = raw as Parameters<typeof assetRecordToRow>[0];
+      if (record.definitionId === 'AST-TYPE-COMPANY') {
+        await supabase.from('companies').upsert(
+          {
+            id: record.id,
+            name: record.name,
+            short_code: record.values?.['fld-company-code'] || '',
+            headquarters: record.values?.['fld-company-hq'] || '',
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'id' }
+        );
+      }
+    }
+    const rows = list.map((item) => assetRecordToRow(item as Parameters<typeof assetRecordToRow>[0]));
+    if (rows.length) {
+      const { error } = await supabase.from('asset_records').upsert(rows, { onConflict: 'id' });
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
+  if (collection === 'audit') {
+    const list = Array.isArray(items) ? items : [];
+    const latest = list.slice(0, 20).map((item) => auditToRow(item as Parameters<typeof auditToRow>[0], companyId));
+    if (latest.length) {
+      const { error } = await supabase.from('audit_logs').upsert(latest, { onConflict: 'id' });
+      if (error) throw new Error(error.message);
+    }
+    return;
+  }
+
+  if (collection === 'evidence') {
+    const list = (Array.isArray(items) ? items : []) as EvidenceFile[];
+    const existing = await supabase.from('evidence').select('id, storage_path').eq('owner_user_id', owner);
+    const pathById = new Map((existing.data || []).map((row) => [String(row.id), String(row.storage_path || '')]));
+    const rows = [];
+    for (const item of list) {
+      let path = pathById.get(item.id) || '';
+      if (item.dataUrl && item.dataUrl.startsWith('data:')) {
+        path =
+          (await uploadDataUrl(supabase, 'evidence', `${owner}/${item.id}/${item.fileName || 'file'}`, item.dataUrl)) ||
+          path;
+      }
+      rows.push(evidenceToRow(item, owner, companyId, path));
+    }
+    await replaceOwnerRows(supabase, 'evidence', owner, rows);
+    return;
+  }
+
+  if (collection === 'training') {
+    const list = (Array.isArray(items) ? items : []) as TrainingRecord[];
+    const existing = await supabase
+      .from('training')
+      .select('id, signed_document_path')
+      .eq('owner_user_id', owner);
+    const pathById = new Map(
+      (existing.data || []).map((row) => [String(row.id), String(row.signed_document_path || '')])
+    );
+    const rows = [];
+    for (const item of list) {
+      let path = pathById.get(item.id) || '';
+      if (item.signedDocumentDataUrl && item.signedDocumentDataUrl.startsWith('data:')) {
+        path =
+          (await uploadDataUrl(
+            supabase,
+            'training-docs',
+            `${owner}/${item.id}/${item.signedDocumentName || 'signed-doc'}`,
+            item.signedDocumentDataUrl
+          )) || path;
+      }
+      rows.push(trainingToRow(item, owner, companyId, path));
+    }
+    await replaceOwnerRows(supabase, 'training', owner, rows);
+    return;
+  }
+
+  const tableByCollection: Record<string, string> = {
+    activities: 'daily_activities',
+    tickets: 'tickets',
+    sapIssues: 'system_issues',
+    projects: 'projects',
+    kpis: 'kpis',
+    reports: 'monthly_reports'
+  };
+  const table = tableByCollection[collection];
+  if (!table) throw new Error(`Unknown collection ${collection}`);
+
+  const list = Array.isArray(items) ? items : [];
+  const mapper: Record<string, (item: never, userId: string, company: string | null) => Record<string, unknown>> = {
+    activities: activityToRow as never,
+    tickets: ticketToRow as never,
+    sapIssues: issueToRow as never,
+    projects: projectToRow as never,
+    kpis: kpiToRow as never,
+    reports: reportToRow as never
+  };
+  const mapFn = mapper[collection];
+  const rows = list.map((item) => mapFn(item as never, owner, companyId));
+  await replaceOwnerRows(supabase, table, owner, rows);
+}
