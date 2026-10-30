@@ -7,6 +7,7 @@ import { auth, DEFAULT_ADMIN_EMAIL } from '@/services/auth';
 import { storage } from '@/services/storage';
 import { goodbyeUser, notify } from '@/lib/systemNotify';
 import { APP_MODULES } from '@/components/Navigation/ModuleRegistry';
+import { modulesInGroup } from '@/lib/menuGroups';
 import { MODULE_ROUTES, pathToModuleId } from '@/lib/moduleRoutes';
 import { IdleLockScreen } from '@/components/System/IdleLockScreen';
 
@@ -30,6 +31,7 @@ interface AppSessionValue {
   setIsLauncherOpen: (open: boolean) => void;
   activeModuleId: string;
   selectModule: (id: string) => void;
+  selectGroup: (groupId: string) => void;
   logout: () => void;
   refreshSession: () => void;
   isNavigating: boolean;
@@ -136,6 +138,19 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
     [router, pathname]
   );
 
+  const selectGroup = useCallback(
+    (groupId: string) => {
+      const allowed = allowedModuleIds(auth.getCurrentUser());
+      const first = modulesInGroup(groupId, allowed)[0];
+      if (first) {
+        selectModule(first.id);
+        return;
+      }
+      selectModule('dashboard');
+    },
+    [selectModule]
+  );
+
   const setActiveCompanyId = useCallback((id: string) => {
     const user = auth.getCurrentUser();
     if (user?.companyId && user.companyId !== id) return;
@@ -178,6 +193,7 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
       setIsLauncherOpen,
       activeModuleId: pathToModuleId(pathname),
       selectModule,
+      selectGroup,
       logout,
       refreshSession,
       isNavigating,
@@ -194,6 +210,7 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
       isLauncherOpen,
       pathname,
       selectModule,
+      selectGroup,
       logout,
       refreshSession,
       isNavigating,

@@ -1,3 +1,4 @@
+import type PptxGenJS from 'pptxgenjs';
 import { MonthlyReportData, ReportTemplate } from '../types';
 import { hexNoHash, resolveTemplate } from '../lib/reportTheme';
 import { downloadBlob, fillPptxTemplate } from '../lib/reportTokens';
@@ -112,7 +113,7 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
   });
 
   // Helper function to add standard slide header & footer
-  const addHeaderFooter = (slide: pptxgen.Slide, sectionTitle: string) => {
+  const addHeaderFooter = (slide: PptxGenJS.Slide, sectionTitle: string) => {
     slide.background = { color: LIGHT_BG };
     
     // Header Bar
@@ -238,7 +239,7 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
   const slideKpis = pptx.addSlide();
   addHeaderFooter(slideKpis, '2. Key Performance Indicators (KPIs) Achievement Matrix');
 
-  const kpiRows: pptxgen.TableRow[] = [
+  const kpiRows: PptxGenJS.TableRow[] = [
     [
       { text: 'KPI ID & Performance Objective', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
       { text: 'Target', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
@@ -276,7 +277,7 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
   const slideActivities = pptx.addSlide();
   addHeaderFooter(slideActivities, '3. Selected High-Impact Completed Activities');
 
-  const actRows: pptxgen.TableRow[] = [
+  const actRows: PptxGenJS.TableRow[] = [
     [
       { text: 'Date', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
       { text: 'Activity Title & Scope', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
@@ -327,7 +328,7 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
   );
 
   // Category breakdown table
-  const ticketRows: pptxgen.TableRow[] = [
+  const ticketRows: PptxGenJS.TableRow[] = [
     [
       { text: 'Ticket Category', options: { bold: true, fill: { color: BLUE }, color: WHITE, fontSize: 10 } },
       { text: 'Incidents Logged', options: { bold: true, fill: { color: BLUE }, color: WHITE, fontSize: 10, align: 'center' } },
@@ -393,7 +394,7 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
 
   const slideProjects = pptx.addSlide();
   addHeaderFooter(slideProjects, '5. Projects & Assigned Performers');
-  const projectRows: pptxgen.TableRow[] = [
+  const projectRows: PptxGenJS.TableRow[] = [
     [
       { text: 'Project', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
       { text: 'Assigned to', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },

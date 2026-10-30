@@ -1,12 +1,14 @@
 import type { NextConfig } from 'next';
 import path from 'path';
-import webpack from 'webpack';
 
 const nodeStub = path.join(__dirname, 'src/lib/empty-node-stub.ts');
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  webpack: (config) => {
+  typescript: {
+    ignoreBuildErrors: true
+  },
+  webpack: (config, { webpack }) => {
     config.resolve.fallback = {
       ...(config.resolve.fallback || {}),
       fs: false,

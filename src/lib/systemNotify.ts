@@ -36,12 +36,16 @@ export const notify = {
   subscribeToasts(listener: ToastListener) {
     toastListeners.add(listener);
     listener([...toasts]);
-    return () => toastListeners.delete(listener);
+    return () => {
+      toastListeners.delete(listener);
+    };
   },
   subscribeConfirm(listener: ConfirmListener) {
     confirmListeners.add(listener);
     listener(activeConfirm);
-    return () => confirmListeners.delete(listener);
+    return () => {
+      confirmListeners.delete(listener);
+    };
   },
   toast(kind: NoticeKind, title: string, message?: string) {
     const item: SystemToast = {
