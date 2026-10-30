@@ -30,22 +30,49 @@ export function applyAppearance(theme: UiTheme, font: UiFont) {
   }
 }
 
-export function readStoredAppearance(): { theme: UiTheme; font: UiFont } {
+export function readStoredTheme(): UiTheme | null {
   try {
     const theme = localStorage.getItem(THEME_KEY);
-    const font = localStorage.getItem(FONT_KEY);
-    return {
-      theme: theme === 'midnight' || theme === 'navy' || theme === 'light' ? theme : 'light',
-      font:
-        font === 'inter' ||
-        font === 'ibm-plex' ||
-        font === 'outfit' ||
-        font === 'source-serif' ||
-        font === 'jakarta'
-          ? font
-          : 'jakarta'
-    };
+    if (theme === 'midnight' || theme === 'navy' || theme === 'light') return theme;
   } catch {
-    return { theme: 'light', font: 'jakarta' };
+    // appearance only
   }
+  return null;
+}
+
+export function readStoredFont(): UiFont | null {
+  try {
+    const font = localStorage.getItem(FONT_KEY);
+    if (
+      font === 'inter' ||
+      font === 'ibm-plex' ||
+      font === 'outfit' ||
+      font === 'source-serif' ||
+      font === 'jakarta'
+    ) {
+      return font;
+    }
+  } catch {
+    // appearance only
+  }
+  return null;
+}
+
+export function readStoredAppearance(): { theme: UiTheme; font: UiFont } {
+  return {
+    theme: readStoredTheme() || 'light',
+    font: readStoredFont() || 'jakarta'
+  };
+}
+
+export function resolveAppearance(settings?: { uiTheme?: UiTheme; uiFont?: UiFont }): {
+  theme: UiTheme;
+  font: UiFont;
+} {
+  const storedTheme = readStoredTheme();
+  const storedFont = readStoredFont();
+  return {
+    theme: storedTheme || settings?.uiTheme || 'light',
+    font: storedFont || settings?.uiFont || 'jakarta'
+  };
 }

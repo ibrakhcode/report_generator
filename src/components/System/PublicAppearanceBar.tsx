@@ -2,7 +2,7 @@
 
 import { Palette } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { UI_THEMES, applyAppearance, readStoredAppearance } from '@/lib/appearance';
+import { UI_THEMES, applyAppearance, resolveAppearance } from '@/lib/appearance';
 import { storage } from '@/services/storage';
 import type { UiTheme } from '@/types';
 
@@ -10,17 +10,15 @@ export function PublicAppearanceBar() {
   const [theme, setTheme] = useState<UiTheme>('light');
 
   useEffect(() => {
-    const stored = readStoredAppearance();
-    const settings = storage.getSettings();
-    const current = settings.uiTheme || stored.theme;
-    setTheme(current);
-    applyAppearance(current, settings.uiFont || stored.font);
+    const next = resolveAppearance(storage.getSettings());
+    setTheme(next.theme);
+    applyAppearance(next.theme, next.font);
   }, []);
 
   const selectTheme = (next: UiTheme) => {
     const settings = storage.getSettings();
     setTheme(next);
-    applyAppearance(next, settings.uiFont);
+    applyAppearance(next, settings.uiFont || 'jakarta');
     storage.saveSettings({ ...settings, uiTheme: next }, { silent: true });
   };
 

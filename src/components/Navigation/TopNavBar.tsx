@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Building2, Calendar, Menu, Radio } from 'lucide-react';
+import { Building2, Calendar, LogOut, Menu, Radio } from 'lucide-react';
 import { APP_MODULES } from './ModuleRegistry';
 import { User } from '../../types';
 import { storage } from '../../services/storage';
@@ -92,7 +92,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         {savedFlash && <span className="hidden sm:inline text-[10px] text-emerald-400">Saved</span>}
 
         {companies.length > 0 && (
-          <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-300">
+          <div className="hidden sm:flex items-center gap-1.5 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-300">
             <span className="relative flex h-2.5 w-2.5" title="Live company workspace">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
               <Radio className="relative w-2.5 h-2.5 text-emerald-400" />
@@ -144,9 +144,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </button>
           <button
             onClick={onLogout}
-            className="px-2 py-1 text-[11px] sm:text-xs border border-slate-700 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 rounded-full shrink-0"
+            className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] sm:text-xs border border-slate-700 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 rounded-full shrink-0"
+            aria-label="Sign out"
           >
-            Sign out
+            <LogOut className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sign out</span>
           </button>
         </div>
       </div>

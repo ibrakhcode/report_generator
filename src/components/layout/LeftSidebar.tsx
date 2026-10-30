@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, LogOut, X } from 'lucide-react';
 import { ModuleIcon } from '@/components/Navigation/ModuleIcon';
 import { allowedModuleIds, useAppSession } from '@/context/AppSessionContext';
 import { MENU_GROUPS, groupFromModuleId, modulesInGroup, standaloneModules } from '@/lib/menuGroups';
@@ -15,7 +15,7 @@ export function LeftSidebar({
   onNavigate?: () => void;
   showClose?: boolean;
 }) {
-  const { currentUser, activeModuleId, selectModule } = useAppSession();
+  const { currentUser, activeModuleId, selectModule, logout } = useAppSession();
   const go = (id: string) => {
     selectModule(id);
     onNavigate?.();
@@ -125,6 +125,19 @@ export function LeftSidebar({
           </div>
         )}
       </nav>
+      <div className="md:hidden p-3 border-t border-slate-800">
+        <button
+          type="button"
+          onClick={() => {
+            onNavigate?.();
+            logout();
+          }}
+          className="w-full flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/30"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign out
+        </button>
+      </div>
     </aside>
   );
 }

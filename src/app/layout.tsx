@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { IBM_Plex_Sans, Inter, JetBrains_Mono, Outfit, Plus_Jakarta_Sans, Source_Serif_4 } from 'next/font/google';
+import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import { AppearanceProvider } from '@/components/layout/AppearanceProvider';
 import { AppSessionProvider } from '@/context/AppSessionContext';
 import { SystemNoticeHost } from '@/components/System/SystemNoticeHost';
@@ -9,34 +9,21 @@ import './globals.css';
 const plusJakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
   variable: '--font-jakarta',
-  weight: ['300', '400', '500', '600', '700', '800']
+  weight: ['400', '500', '600', '700'],
+  display: 'swap'
 });
 
 const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-inter'
-});
-
-const ibmPlex = IBM_Plex_Sans({
-  subsets: ['latin'],
-  variable: '--font-ibm-plex',
-  weight: ['400', '500', '600', '700']
-});
-
-const outfit = Outfit({
-  subsets: ['latin'],
-  variable: '--font-outfit'
-});
-
-const sourceSerif = Source_Serif_4({
-  subsets: ['latin'],
-  variable: '--font-source-serif'
+  variable: '--font-inter',
+  display: 'swap'
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   variable: '--font-mono',
-  weight: ['400', '500', '600']
+  weight: ['400', '500'],
+  display: 'swap'
 });
 
 export const viewport = {
@@ -57,8 +44,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       lang="en"
       data-theme="light"
       data-font="jakarta"
-      className={`${plusJakarta.variable} ${inter.variable} ${ibmPlex.variable} ${outfit.variable} ${sourceSerif.variable} ${jetbrainsMono.variable}`}
+      suppressHydrationWarning
+      className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable}`}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('hesu_ui_theme');var f=localStorage.getItem('hesu_ui_font');if(t==='midnight'||t==='navy'||t==='light')document.documentElement.dataset.theme=t;if(f==='jakarta'||f==='inter'||f==='ibm-plex'||f==='outfit'||f==='source-serif')document.documentElement.dataset.font=f;}catch(e){}"
+          }}
+        />
+      </head>
       <body className="bg-slate-950 text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
         <AppSessionProvider>
           <AppearanceProvider>

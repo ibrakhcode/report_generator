@@ -87,15 +87,21 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
       setActiveCompanyIdState(storage.getActiveCompanyId());
       setWorkspaceRevision((current) => current + 1);
     });
-    void auth.ensureSeededAdmin().then(async () => {
+    let cancelled = false;
+    void (async () => {
       await auth.restoreCloudSession();
+      if (cancelled) return;
+      refreshSession();
+      setReady(true);
+      if (!auth.getCurrentUser()) return;
       await storage.syncFromCloud();
+      if (cancelled) return;
       const period = storage.getSettings().defaultReportingPeriod;
       if (period) setSelectedMonth(period);
       refreshSession();
-      setReady(true);
-    });
+    })();
     return () => {
+      cancelled = true;
       unsubAuth();
       unsubLock();
       unsubStorage();

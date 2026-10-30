@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Eye,
   EyeOff,
@@ -40,9 +40,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
   );
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    void auth.ensureSeededAdmin();
-  }, []);
 
   const goTab = (tab: 'login' | 'register' | 'forgot') => {
     setActiveTab(tab);

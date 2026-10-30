@@ -2,14 +2,13 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { storage } from '@/services/storage';
-import { applyAppearance, readStoredAppearance } from '@/lib/appearance';
+import { applyAppearance, resolveAppearance } from '@/lib/appearance';
 
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const applyFromStorage = () => {
-      const stored = readStoredAppearance();
-      const settings = storage.getSettings();
-      applyAppearance(settings.uiTheme || stored.theme, settings.uiFont || stored.font);
+      const next = resolveAppearance(storage.getSettings());
+      applyAppearance(next.theme, next.font);
     };
     applyFromStorage();
     return storage.subscribe(applyFromStorage);

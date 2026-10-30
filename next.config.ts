@@ -5,6 +5,10 @@ const nodeStub = path.join(__dirname, 'src/lib/empty-node-stub.ts');
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  compress: true,
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts']
+  },
   typescript: {
     ignoreBuildErrors: true
   },
