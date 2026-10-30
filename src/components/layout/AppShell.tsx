@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { TopNavBar } from '@/components/Navigation/TopNavBar';
 import { LeftSidebar } from '@/components/layout/LeftSidebar';
@@ -23,6 +23,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     selectModule,
     logout
   } = useAppSession();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -45,6 +46,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [ready, currentUser, companyRegistered, pathname, router]);
 
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [pathname]);
+
   if (!ready || !currentUser || !companyRegistered) {
     return (
       <div className="h-dvh w-full bg-slate-950 flex items-center justify-center">
@@ -63,6 +68,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <TopNavBar
         activeModuleId={activeModuleId}
         onSelectModule={selectModule}
+        onOpenMenu={() => setMobileNavOpen(true)}
         currentUser={currentUser}
         onLogout={logout}
         selectedMonth={selectedMonth}
@@ -70,13 +76,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       />
 
       <div className="flex-1 min-h-0 w-full flex overflow-hidden">
-        <LeftSidebar />
-        <main key={activeCompanyId} className="flex-1 min-h-0 w-full overflow-y-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="hidden md:flex h-full">
+          <LeftSidebar />
+        </div>
+        {mobileNavOpen && (
+          <div className="md:hidden fixed inset-0 z-50 flex">
+            <button
+              type="button"
+              className="absolute inset-0 bg-slate-950/70"
+              aria-label="Close menu overlay"
+              onClick={() => setMobileNavOpen(false)}
+            />
+            <div className="relative z-10 h-full w-[min(100%,280px)] shadow-2xl">
+              <LeftSidebar showClose onNavigate={() => setMobileNavOpen(false)} className="h-full w-full" />
+            </div>
+          </div>
+        )}
+        <main
+          key={activeCompanyId}
+          className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4"
+        >
           {children}
         </main>
       </div>
 
-      <footer className="shrink-0 border-t border-slate-800 bg-slate-900 px-5 py-2 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-1.5">
+      <footer className="hidden sm:flex shrink-0 border-t border-slate-800 bg-slate-900 px-5 py-2 text-xs text-slate-500 flex-col sm:flex-row items-center justify-between gap-1.5">
         <span>{settings.companyName} &copy; 2026. ICT Performance &amp; Reporting System.</span>
         <span>Timezone: {settings.businessTimezone}</span>
       </footer>

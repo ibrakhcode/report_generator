@@ -152,7 +152,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
           <circle cx="86%" cy="12%" r="4" fill="#8eafdc" opacity="0.45" />
         </svg>
 
-        <div className="login-card relative z-10 w-full max-w-[420px] rounded-[26px] px-8 py-9 sm:px-10">
+        <div className="login-card relative z-10 w-full max-w-[420px] rounded-[26px] px-5 py-7 sm:px-10 sm:py-9">
           <PublicAppearanceBar />
           <div className="text-center mb-6">
             <div className="flex items-end justify-center leading-none">

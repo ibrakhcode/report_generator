@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Building2, Calendar, Radio } from 'lucide-react';
+import { Building2, Calendar, Menu, Radio } from 'lucide-react';
 import { APP_MODULES } from './ModuleRegistry';
 import { User } from '../../types';
 import { storage } from '../../services/storage';
@@ -12,6 +12,7 @@ interface TopNavBarProps {
   activeModuleId: string;
   onSelectModule: (id: string) => void;
   onOpenLauncher?: () => void;
+  onOpenMenu?: () => void;
   currentUser: User | null;
   onLogout: () => void;
   selectedMonth: string;
@@ -22,6 +23,7 @@ interface TopNavBarProps {
 export const TopNavBar: React.FC<TopNavBarProps> = ({
   activeModuleId,
   onSelectModule,
+  onOpenMenu,
   currentUser,
   onLogout,
   selectedMonth,
@@ -54,9 +56,19 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-slate-100 px-4 sm:px-5 h-12 flex items-center justify-between gap-3 shrink-0">
-      <div className="flex items-center gap-2.5 shrink-0 min-w-0">
-        <span className="font-bold text-sm tracking-tight text-white">
+    <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-slate-100 px-3 sm:px-5 min-h-12 py-1.5 flex items-center justify-between gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 min-w-0">
+        {onOpenMenu && (
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="md:hidden p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        <span className="font-bold text-sm tracking-tight text-white truncate max-w-[42vw] sm:max-w-none">
           {settings.brandShortName || settings.companyName || 'ICT Reporting'}
         </span>
         {activeModule && (
@@ -64,11 +76,11 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
         <button
           type="button"
           onClick={toggleAutoSave}
-          className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+          className={`hidden md:inline-flex px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
             autoSave
               ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40'
               : 'bg-slate-800 text-slate-400 border-slate-700'
@@ -89,7 +101,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
             <select
               value={activeCompanyId}
               onChange={(e) => setActiveCompanyId(e.target.value)}
-              className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer pr-1 font-medium max-w-[160px]"
+              className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer pr-1 font-medium max-w-[28vw] sm:max-w-[160px]"
               title="Live working company"
             >
               {companies.map((company) => (
@@ -132,7 +144,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           </button>
           <button
             onClick={onLogout}
-            className="px-2.5 py-1 text-xs border border-slate-700 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 rounded-full"
+            className="px-2 py-1 text-[11px] sm:text-xs border border-slate-700 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 rounded-full shrink-0"
           >
             Sign out
           </button>

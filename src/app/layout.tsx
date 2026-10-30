@@ -39,6 +39,12 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ['400', '500', '600']
 });
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1
+};
+
 export const metadata: Metadata = {
   title: 'HESU ICT Performance & Reporting Management System',
   description:

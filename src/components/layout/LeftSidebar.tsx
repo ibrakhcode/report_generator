@@ -1,13 +1,25 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { ModuleIcon } from '@/components/Navigation/ModuleIcon';
 import { allowedModuleIds, useAppSession } from '@/context/AppSessionContext';
 import { MENU_GROUPS, groupFromModuleId, modulesInGroup, standaloneModules } from '@/lib/menuGroups';
 
-export function LeftSidebar() {
+export function LeftSidebar({
+  className = '',
+  onNavigate,
+  showClose = false
+}: {
+  className?: string;
+  onNavigate?: () => void;
+  showClose?: boolean;
+}) {
   const { currentUser, activeModuleId, selectModule } = useAppSession();
+  const go = (id: string) => {
+    selectModule(id);
+    onNavigate?.();
+  };
   const allowed = allowedModuleIds(currentUser);
   const activeGroup = groupFromModuleId(activeModuleId);
   const [openGroups, setOpenGroups] = useState<string[]>(activeGroup ? [activeGroup.id] : ['operations']);
@@ -32,9 +44,19 @@ export function LeftSidebar() {
   };
 
   return (
-    <aside className="flex w-[260px] shrink-0 h-full flex-col border-r border-slate-800 bg-slate-900">
-      <div className="px-4 py-3.5 border-b border-slate-800">
+    <aside className={`flex w-[min(100%,260px)] shrink-0 h-full flex-col border-r border-slate-800 bg-slate-900 ${className}`}>
+      <div className="px-4 py-3.5 border-b border-slate-800 flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Navigation</p>
+        {showClose && (
+          <button
+            type="button"
+            onClick={onNavigate}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 md:hidden"
+            aria-label="Close menu"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
       <nav className="flex-1 min-h-0 overflow-y-auto py-3 px-2.5">
         {groups.map((group) => {
@@ -63,7 +85,7 @@ export function LeftSidebar() {
                       <button
                         key={mod.id}
                         type="button"
-                        onClick={() => selectModule(mod.id)}
+                        onClick={() => go(mod.id)}
                         className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm ${
                           active
                             ? 'bg-teal-500/15 text-teal-300 font-semibold'
@@ -88,7 +110,7 @@ export function LeftSidebar() {
                 <button
                   key={mod.id}
                   type="button"
-                  onClick={() => selectModule(mod.id)}
+                  onClick={() => go(mod.id)}
                   className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold ${
                     active
                       ? 'bg-teal-500/15 text-teal-300'
