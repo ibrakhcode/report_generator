@@ -39,6 +39,13 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   const devices = storage.getDeviceNames();
   const defaultDepartment = departments[0] || '';
 
+  const reportedAtInSelectedMonth = () => {
+    const now = new Date();
+    const today = now.toISOString();
+    if (today.startsWith(selectedMonth)) return today;
+    return `${selectedMonth}-01T12:00:00.000Z`;
+  };
+
   const [formData, setFormData] = useState<Partial<SupportTicket>>({
     requesterName: '',
     requesterEmail: '',
@@ -88,7 +95,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
     const nextId = `TCK-2026-${String(tickets.length + 1).padStart(3, '0')}`;
     setFormData({
       id: nextId,
-      reportedAt: new Date().toISOString(),
+      reportedAt: reportedAtInSelectedMonth(),
       requesterName: '',
       requesterEmail: '',
       department: defaultDepartment,
@@ -124,10 +131,10 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
     });
     setFormData({
       ...formData,
-      description: formData.description?.trim() ? formData.description : draft.description,
-      actionsTaken: formData.actionsTaken?.trim() ? formData.actionsTaken : draft.actionsTaken,
-      rootCause: formData.rootCause?.trim() ? formData.rootCause : draft.rootCause,
-      resolution: formData.resolution?.trim() ? formData.resolution : draft.resolution
+      description: draft.description,
+      actionsTaken: draft.actionsTaken,
+      rootCause: draft.rootCause,
+      resolution: draft.resolution
     });
     notify.success('Draft ready', 'Review the description and company impact, then save.');
   };
@@ -408,17 +415,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
               </div>
 
               <div>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <label className="block text-slate-400 font-semibold">Issue Title</label>
-                  <button
-                    type="button"
-                    onClick={applyWritingHelp}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-400 hover:text-teal-300"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Help me write
-                  </button>
-                </div>
+                <label className="block text-slate-400 font-semibold mb-1">Issue Title</label>
                 <input
                   type="text"
                   required
@@ -430,7 +427,17 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Description</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-slate-400 font-semibold">Description</label>
+                  <button
+                    type="button"
+                    onClick={applyWritingHelp}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-400 hover:text-teal-300"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Generate description
+                  </button>
+                </div>
                 <textarea
                   rows={3}
                   value={formData.description}

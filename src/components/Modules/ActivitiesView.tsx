@@ -41,9 +41,14 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   const devices = storage.getDeviceNames();
   const defaultDepartment = departments[0] || '';
 
+  const dateInSelectedMonth = () => {
+    const today = new Date().toISOString().split('T')[0];
+    return today.startsWith(selectedMonth) ? today : `${selectedMonth}-01`;
+  };
+
   // Form State
   const [formData, setFormData] = useState<Partial<DailyActivity>>({
-    date: new Date().toISOString().split('T')[0],
+    date: dateInSelectedMonth(),
     title: '',
     description: '',
     category: 'ERP',
@@ -93,7 +98,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
     const nextId = `ACT-2026-${String(activities.length + 1).padStart(3, '0')}`;
     setFormData({
       id: nextId,
-      date: new Date().toISOString().split('T')[0],
+      date: dateInSelectedMonth(),
       title: '',
       description: '',
       category: 'ERP',
@@ -131,10 +136,10 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
     });
     setFormData({
       ...formData,
-      description: formData.description?.trim() ? formData.description : draft.description,
-      actionTaken: formData.actionTaken?.trim() ? formData.actionTaken : draft.actionTaken,
-      resultOutcome: formData.resultOutcome?.trim() ? formData.resultOutcome : draft.resultOutcome,
-      businessImpact: formData.businessImpact?.trim() ? formData.businessImpact : draft.businessImpact
+      description: draft.description,
+      actionTaken: draft.actionTaken,
+      resultOutcome: draft.resultOutcome,
+      businessImpact: draft.businessImpact
     });
     notify.success('Draft ready', 'Review the description and company impact, then save.');
   };
@@ -194,14 +199,14 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     const saved = await persistActivity();
+    setIsModalOpen(false);
     if (!saved) {
       notify.error(
-        'Not saved to the database',
-        storage.getLastPersistError() || 'The activity stayed on this screen only. Check the server connection and try again.'
+        'Activity is on this list, but not in the database',
+        storage.getLastPersistError() || 'Check the server connection and try Save again.'
       );
       return;
     }
-    setIsModalOpen(false);
     notify.success(editingItem ? 'Activity updated' : 'Activity saved', 'The daily work record is stored in the database.');
   };
 
@@ -398,17 +403,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
               </div>
 
               <div>
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <label className="block text-slate-400 font-semibold">Activity Title</label>
-                  <button
-                    type="button"
-                    onClick={applyWritingHelp}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-400 hover:text-teal-300"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Help me write
-                  </button>
-                </div>
+                <label className="block text-slate-400 font-semibold mb-1">Activity Title</label>
                 <input
                   type="text"
                   required
@@ -420,7 +415,17 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Description</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-slate-400 font-semibold">Description</label>
+                  <button
+                    type="button"
+                    onClick={applyWritingHelp}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-400 hover:text-teal-300"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Generate description
+                  </button>
+                </div>
                 <textarea
                   rows={3}
                   value={formData.description}
