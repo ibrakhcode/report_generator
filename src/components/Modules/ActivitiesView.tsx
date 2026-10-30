@@ -14,13 +14,15 @@ import {
   Edit2,
   Trash2,
   Paperclip,
-  Tag
+  Tag,
+  Sparkles
 } from 'lucide-react';
 import { DailyActivity, PriorityLevel, ActivityStatus } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
+import { draftDailyWork } from '@/lib/writeAssist';
 
 interface ActivitiesViewProps {
   selectedMonth: string;
@@ -111,6 +113,29 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
     });
     setEditingItem(null);
     setIsModalOpen(true);
+  };
+
+  const applyWritingHelp = () => {
+    if (!formData.title?.trim()) {
+      notify.error('Add a title first', 'Enter the activity title so the system can draft the description and impact.');
+      return;
+    }
+    const draft = draftDailyWork({
+      title: formData.title,
+      category: formData.category,
+      department: formData.department,
+      systemOrDevice: formData.systemOrDevice,
+      status: formData.status,
+      hoursSpent: formData.hoursSpent
+    });
+    setFormData({
+      ...formData,
+      description: formData.description?.trim() ? formData.description : draft.description,
+      actionTaken: formData.actionTaken?.trim() ? formData.actionTaken : draft.actionTaken,
+      resultOutcome: formData.resultOutcome?.trim() ? formData.resultOutcome : draft.resultOutcome,
+      businessImpact: formData.businessImpact?.trim() ? formData.businessImpact : draft.businessImpact
+    });
+    notify.success('Draft ready', 'Review the description and company impact, then save.');
   };
 
   const handleOpenEdit = (act: DailyActivity) => {
@@ -361,13 +386,34 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Activity Title</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-slate-400 font-semibold">Activity Title</label>
+                  <button
+                    type="button"
+                    onClick={applyWritingHelp}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-400 hover:text-teal-300"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Help me write
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g. Month-end financial reconciliation"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="What was done, on which system, and for which unit..."
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
                 />
               </div>

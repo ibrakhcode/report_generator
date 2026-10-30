@@ -91,14 +91,14 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
     void (async () => {
       await auth.restoreCloudSession();
       if (cancelled) return;
+      if (auth.getCurrentUser()) {
+        await storage.syncFromCloud();
+        if (cancelled) return;
+        const period = storage.getSettings().defaultReportingPeriod;
+        if (period) setSelectedMonth(period);
+      }
       refreshSession();
       setReady(true);
-      if (!auth.getCurrentUser()) return;
-      await storage.syncFromCloud();
-      if (cancelled) return;
-      const period = storage.getSettings().defaultReportingPeriod;
-      if (period) setSelectedMonth(period);
-      refreshSession();
     })();
     return () => {
       cancelled = true;

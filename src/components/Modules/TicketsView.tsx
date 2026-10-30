@@ -12,13 +12,15 @@ import {
   X,
   Edit2,
   Trash2,
-  ExternalLink
+  ExternalLink,
+  Sparkles
 } from 'lucide-react';
 import { SupportTicket, TicketCategory, TicketStatus, PriorityLevel } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
+import { draftTicketWriteup } from '@/lib/writeAssist';
 
 interface TicketsViewProps {
   selectedMonth: string;
@@ -104,6 +106,29 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
     });
     setEditingTicket(null);
     setIsModalOpen(true);
+  };
+
+  const applyWritingHelp = () => {
+    if (!formData.title?.trim()) {
+      notify.error('Add a title first', 'Enter the issue title so the system can draft the description and impact.');
+      return;
+    }
+    const draft = draftTicketWriteup({
+      title: formData.title,
+      category: formData.category,
+      department: formData.department,
+      applicationOrDevice: formData.applicationOrDevice,
+      priority: formData.priority,
+      status: formData.status
+    });
+    setFormData({
+      ...formData,
+      description: formData.description?.trim() ? formData.description : draft.description,
+      actionsTaken: formData.actionsTaken?.trim() ? formData.actionsTaken : draft.actionsTaken,
+      rootCause: formData.rootCause?.trim() ? formData.rootCause : draft.rootCause,
+      resolution: formData.resolution?.trim() ? formData.resolution : draft.resolution
+    });
+    notify.success('Draft ready', 'Review the description and company impact, then save.');
   };
 
   const handleOpenEdit = (tck: SupportTicket) => {
@@ -388,13 +413,34 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Issue Title</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-slate-400 font-semibold">Issue Title</label>
+                  <button
+                    type="button"
+                    onClick={applyWritingHelp}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-400 hover:text-teal-300"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Help me write
+                  </button>
+                </div>
                 <input
                   type="text"
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g. Zebra Label Printer Thermal Roller Jam in Dispatch Room"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-400 font-semibold mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="What happened, who is affected, and why it matters to the company..."
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
                 />
               </div>

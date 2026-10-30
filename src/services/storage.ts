@@ -161,6 +161,7 @@ export const INITIAL_TEMPLATE: ReportTemplate = {
 class StorageService {
   private listeners: Set<() => void> = new Set();
   private hydrating = false;
+  private persistQueue = new Map<RmsCollection, unknown>();
   private mem = new Map<string, string>();
   private sessionAccount: User | null = null;
 
@@ -215,16 +216,42 @@ class StorageService {
   }
 
   private persistNow(collection: RmsCollection, items: unknown) {
-    if (typeof window === 'undefined' || this.hydrating) return;
+    if (typeof window === 'undefined') return;
+    if (this.hydrating) {
+      this.persistQueue.set(collection, items);
+      return;
+    }
     void fetch('/api/rms/workspace', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ collection, items })
     }).then((response) => {
-      if (collection === 'users' && response.ok) {
+      if (!response.ok) {
+        this.persistQueue.set(collection, items);
+        return;
+      }
+      if (collection === 'users') {
         void fetch('/api/auth/me');
       }
     });
+  }
+
+  private flushPersistQueue() {
+    if (this.hydrating || this.persistQueue.size === 0) return;
+    const queued = Array.from(this.persistQueue.entries());
+    this.persistQueue.clear();
+    queued.forEach(([collection, items]) => this.persistNow(collection, items));
+  }
+
+  private mergeById<T extends { id: string }>(cloud: T[], local: T[]): T[] {
+    const map = new Map<string, T>();
+    cloud.forEach((item) => {
+      if (item?.id) map.set(item.id, item);
+    });
+    local.forEach((item) => {
+      if (item?.id && !map.has(item.id)) map.set(item.id, item);
+    });
+    return Array.from(map.values());
   }
 
   public async syncFromCloud(): Promise<void> {
@@ -257,6 +284,7 @@ class StorageService {
     } finally {
       this.hydrating = false;
     }
+    this.flushPersistQueue();
     this.notify();
   }
 
@@ -276,18 +304,28 @@ class StorageService {
     assetRecords?: AssetRecord[];
     settings?: AppSettings | null;
   }) {
-    const take = <T>(cloud: T[] | undefined, write: (items: T[]) => void) => {
-      if (cloud) write(cloud);
+    const takeMerged = <T extends { id: string }>(
+      cloud: T[] | undefined,
+      local: T[],
+      base: string,
+      collection: RmsCollection
+    ) => {
+      if (!cloud) return;
+      const merged = this.mergeById(cloud, local);
+      this.writeArray(base, merged, { cloud: false });
+      if (merged.length > cloud.length) this.persistQueue.set(collection, merged);
     };
-    take(data.activities, (items) => this.writeArray(STORAGE_KEYS.ACTIVITIES, items, { cloud: false }));
-    take(data.tickets, (items) => this.writeArray(STORAGE_KEYS.TICKETS, items, { cloud: false }));
-    take(data.sapIssues, (items) => this.writeArray(STORAGE_KEYS.SAP_ISSUES, items, { cloud: false }));
-    take(data.projects, (items) => this.writeArray(STORAGE_KEYS.PROJECTS, items, { cloud: false }));
-    take(data.kpis, (items) => this.writeArray(STORAGE_KEYS.KPIS, items, { cloud: false }));
-    take(data.evidence, (items) => this.writeArray(STORAGE_KEYS.EVIDENCE, items, { cloud: false }));
-    take(data.training, (items) => this.writeArray(STORAGE_KEYS.TRAINING, items, { cloud: false }));
-    take(data.reports, (items) => this.writeArray(STORAGE_KEYS.REPORTS, items, { cloud: false }));
-    take(data.templates, (items) => this.writeArray(STORAGE_KEYS.TEMPLATES, items, { cloud: false }));
+    takeMerged(data.activities, this.getActivities(), STORAGE_KEYS.ACTIVITIES, 'activities');
+    takeMerged(data.tickets, this.getTickets(), STORAGE_KEYS.TICKETS, 'tickets');
+    takeMerged(data.sapIssues, this.getSapIssues(), STORAGE_KEYS.SAP_ISSUES, 'sapIssues');
+    takeMerged(data.projects, this.getProjects(), STORAGE_KEYS.PROJECTS, 'projects');
+    takeMerged(data.kpis, this.getKpis(), STORAGE_KEYS.KPIS, 'kpis');
+    takeMerged(data.evidence, this.getEvidence(), STORAGE_KEYS.EVIDENCE, 'evidence');
+    takeMerged(data.training, this.getTraining(), STORAGE_KEYS.TRAINING, 'training');
+    takeMerged(data.reports, this.getReports(), STORAGE_KEYS.REPORTS, 'reports');
+    if (data.templates) {
+      this.writeArray(STORAGE_KEYS.TEMPLATES, data.templates, { cloud: false });
+    }
     if (data.users) {
       this.memWrite(STORAGE_KEYS.USERS, JSON.stringify(data.users));
     }
