@@ -36,7 +36,7 @@ export function MultiPick({
       {options.length === 0 ? (
         <p className="text-[11px] text-slate-500">{emptyHint}</p>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-40 overflow-y-auto rounded-xl border border-slate-700 bg-slate-800/40 p-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-28 sm:max-h-40 overflow-y-auto rounded-xl border border-slate-700 bg-slate-800/40 p-2">
           {options.map((name) => {
             const checked = selected.includes(name);
             return (

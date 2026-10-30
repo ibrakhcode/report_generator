@@ -117,12 +117,12 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   };
 
   const applyWritingHelp = () => {
-    if (!formData.title?.trim()) {
-      notify.error('Add a title first', 'Enter the issue title so the system can draft the description and impact.');
-      return;
-    }
+    const title =
+      formData.title?.trim() ||
+      [formData.category, formData.department, formData.applicationOrDevice].filter(Boolean).join(' — ') ||
+      'IT support issue';
     const draft = draftTicketWriteup({
-      title: formData.title,
+      title,
       category: formData.category,
       department: formData.department,
       applicationOrDevice: formData.applicationOrDevice,
@@ -131,12 +131,13 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
     });
     setFormData({
       ...formData,
+      title,
       description: draft.description,
       actionsTaken: draft.actionsTaken,
       rootCause: draft.rootCause,
       resolution: draft.resolution
     });
-    notify.success('Draft ready', 'Review the description and company impact, then save.');
+    notify.success('Draft ready', 'Review the title, description and company impact, then save.');
   };
 
   const handleOpenEdit = (tck: SupportTicket) => {
@@ -378,9 +379,9 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
 
       {/* Ticket Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 text-slate-100 shadow-2xl my-8">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden">
+          <div className="bg-slate-900 border border-slate-800 sm:rounded-2xl rounded-t-2xl max-w-2xl w-full text-slate-100 shadow-2xl max-h-[100dvh] sm:max-h-[92dvh] flex flex-col">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-800 shrink-0">
               <h3 className="text-base font-bold text-white">
                 {editingTicket ? `Edit Support Ticket: ${editingTicket.id}` : 'Open Support Ticket'}
               </h3>
@@ -392,7 +393,8 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-4 text-xs">
+            <form onSubmit={handleSave} className="flex flex-col min-h-0 flex-1 text-xs">
+              <div className="space-y-3 overflow-y-auto px-4 sm:px-6 py-3 min-h-0 flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Requester Full Name</label>
@@ -439,7 +441,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                   </button>
                 </div>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="What happened, who is affected, and why it matters to the company..."
@@ -518,7 +520,8 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              </div>
+              <div className="flex items-center justify-end gap-3 px-4 sm:px-6 py-3 border-t border-slate-800 shrink-0 bg-slate-900 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
