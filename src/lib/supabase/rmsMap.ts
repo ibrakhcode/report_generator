@@ -62,11 +62,12 @@ function tsOrNull(v: unknown): string | null {
 }
 
 export function activityToRow(item: DailyActivity, userId: string, companyId: string | null) {
+  const company = String(companyId || '').trim() || null;
   return {
     id: item.id,
     owner_user_id: userId,
-    company_id: companyId,
-    date: dateOrNull(item.date),
+    company_id: company,
+    date: dateOrNull(item.date) || new Date().toISOString().slice(0, 10),
     title: item.title,
     description: item.description || '',
     category: item.category || '',

@@ -64,7 +64,11 @@ export function AssetMasterView() {
     setRecords(storage.getAssetRecords());
   }, [selectedType, recordName, recordValues, editingRecordId]);
 
-  useAutoSave(autoSave && tab === 'record', { recordName, recordValues, selectedTypeId }, persistRecord);
+  useAutoSave(
+    autoSave && tab === 'record' && Boolean(editingRecordId),
+    { recordName, recordValues, selectedTypeId, editingRecordId },
+    persistRecord
+  );
 
   const flash = (text: string) => {
     setMessage(text);
@@ -122,12 +126,26 @@ export function AssetMasterView() {
       flash(`Fill required data: ${missing.map((field) => field.label).join(', ')}`);
       return;
     }
+    const wasNew = !editingRecordId;
     persistRecord();
+    if (wasNew) {
+      setEditingRecordId(null);
+      setRecordName('');
+      setRecordValues({});
+    }
     flash(
       selectedType.systemKey === 'company'
         ? 'Company saved. It is now Live-selectable in the top bar.'
-        : 'Asset record saved.'
+        : wasNew
+          ? 'Saved. You can add another department or asset below.'
+          : 'Asset record updated.'
     );
+  };
+
+  const startNewRecord = () => {
+    setEditingRecordId(null);
+    setRecordName('');
+    setRecordValues({});
   };
 
   const editRecord = (item: AssetRecord) => {
@@ -352,7 +370,13 @@ export function AssetMasterView() {
                     value={recordName}
                     onChange={(e) => setRecordName(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
-                    placeholder="e.g. Dell Latitude 5430"
+                    placeholder={
+                      selectedType.systemKey === 'department'
+                        ? 'e.g. Finance'
+                        : selectedType.systemKey === 'device'
+                          ? 'e.g. Dell Latitude 5430'
+                          : 'Asset name'
+                    }
                   />
                 </div>
                 {selectedType.fields.map((field) => (
@@ -395,14 +419,24 @@ export function AssetMasterView() {
                     )}
                   </div>
                 ))}
-                <button
-                  type="button"
-                  onClick={saveRecord}
-                  className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold inline-flex items-center justify-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  Save asset
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={startNewRecord}
+                    className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-300 text-xs font-semibold inline-flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add another
+                  </button>
+                  <button
+                    type="button"
+                    onClick={saveRecord}
+                    className="flex-1 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold inline-flex items-center justify-center gap-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    {editingRecordId ? 'Update' : 'Save'}
+                  </button>
+                </div>
               </>
             )}
           </div>

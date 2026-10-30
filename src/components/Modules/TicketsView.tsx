@@ -21,6 +21,7 @@ import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { draftTicketWriteup } from '@/lib/writeAssist';
+import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 
 interface TicketsViewProps {
   selectedMonth: string;
@@ -397,19 +398,13 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Department</label>
-                  <select
-                    value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    {departments.length === 0 && <option value="">Record departments in Master Assets</option>}
-                    {departments.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
+                <MultiPick
+                  label="Departments"
+                  options={departments}
+                  value={formData.department}
+                  onChange={(department) => setFormData({ ...formData, department })}
+                  emptyHint="Add departments in Master Assets, then tick one or more here."
+                />
               </div>
 
               <div>
@@ -486,23 +481,13 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                 </div>
               </div>
 
-              <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Application or Device</label>
-                  <select
-                    value={formData.applicationOrDevice}
-                    onChange={(e) => setFormData({ ...formData, applicationOrDevice: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    <option value="">Select device</option>
-                    {devices.length === 0 && <option value="">Record devices in Master Assets</option>}
-                    {devices.map((device) => (
-                      <option key={device} value={device}>{device}</option>
-                    ))}
-                    {formData.applicationOrDevice && !devices.includes(formData.applicationOrDevice) && (
-                      <option value={formData.applicationOrDevice}>{formData.applicationOrDevice}</option>
-                    )}
-                  </select>
-              </div>
+              <MultiPick
+                label="Assets / systems involved"
+                options={Array.from(new Set([...devices, ...splitPicked(formData.applicationOrDevice)]))}
+                value={formData.applicationOrDevice}
+                onChange={(applicationOrDevice) => setFormData({ ...formData, applicationOrDevice })}
+                emptyHint="Add devices in Master Assets, then tick one or more here."
+              />
 
               <div>
                 <label className="block text-slate-400 font-semibold mb-1">Actions Taken & Technical Resolution</label>

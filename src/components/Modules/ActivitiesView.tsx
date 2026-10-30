@@ -23,6 +23,7 @@ import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { draftDailyWork } from '@/lib/writeAssist';
+import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 
 interface ActivitiesViewProps {
   selectedMonth: string;
@@ -152,8 +153,8 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
     notify.success('Activity deleted', `${id} was removed.`);
   };
 
-  const persistActivity = useCallback(() => {
-    if (!formData.title || !formData.date) return;
+  const persistActivity = useCallback(async () => {
+    if (!formData.title || !formData.date) return false;
     const toSave: DailyActivity = {
       id: formData.id || `ACT-2026-${Date.now()}`,
       date: formData.date || new Date().toISOString().split('T')[0],
@@ -179,18 +180,29 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
       updatedAt: new Date().toISOString()
     };
     storage.saveActivity(toSave);
+    const saved = await storage.waitForLastPersist();
     setActivities(storage.getActivities());
     setFormData(toSave);
     setEditingItem(toSave);
+    return saved;
   }, [formData, defaultDepartment]);
 
-  useAutoSave(autoSave && isModalOpen, formData, persistActivity);
+  useAutoSave(autoSave && isModalOpen, formData, () => {
+    void persistActivity();
+  });
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistActivity();
+    const saved = await persistActivity();
+    if (!saved) {
+      notify.error(
+        'Not saved to the database',
+        storage.getLastPersistError() || 'The activity stayed on this screen only. Check the server connection and try again.'
+      );
+      return;
+    }
     setIsModalOpen(false);
-    notify.success(editingItem ? 'Activity updated' : 'Activity saved', 'The daily work record is in place.');
+    notify.success(editingItem ? 'Activity updated' : 'Activity saved', 'The daily work record is stored in the database.');
   };
 
   return (
@@ -418,7 +430,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Category</label>
                   <select
@@ -431,21 +443,6 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                     ))}
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Department</label>
-                  <select
-                    value={formData.department}
-                    onChange={(e) => setFormData({ ...formData, department: e.target.value as DailyActivity['department'] })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    {departments.length === 0 && <option value="">Record departments in Master Assets</option>}
-                    {departments.map((d) => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
-                  </select>
-                </div>
-
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Status</label>
                   <select
@@ -460,22 +457,21 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-400 font-semibold mb-1">System / Hardware Involved</label>
-                <select
-                  value={formData.systemOrDevice}
-                  onChange={(e) => setFormData({ ...formData, systemOrDevice: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                >
-                  <option value="">Select device</option>
-                  {devices.map((device) => (
-                    <option key={device} value={device}>{device}</option>
-                  ))}
-                  {formData.systemOrDevice && !devices.includes(formData.systemOrDevice) && (
-                    <option value={formData.systemOrDevice}>{formData.systemOrDevice}</option>
-                  )}
-                </select>
-              </div>
+              <MultiPick
+                label="Departments"
+                options={departments}
+                value={formData.department}
+                onChange={(department) => setFormData({ ...formData, department })}
+                emptyHint="Add departments in Master Assets, then tick one or more here."
+              />
+
+              <MultiPick
+                label="Assets / systems involved"
+                options={Array.from(new Set([...devices, ...splitPicked(formData.systemOrDevice)]))}
+                value={formData.systemOrDevice}
+                onChange={(systemOrDevice) => setFormData({ ...formData, systemOrDevice })}
+                emptyHint="Add devices in Master Assets, then tick one or more here."
+              />
 
               <div>
                 <label className="block text-slate-400 font-semibold mb-1">Action Taken</label>

@@ -162,6 +162,8 @@ class StorageService {
   private listeners: Set<() => void> = new Set();
   private hydrating = false;
   private persistQueue = new Map<RmsCollection, unknown>();
+  private lastPersistPromise: Promise<boolean> | null = null;
+  private lastPersistError = '';
   private mem = new Map<string, string>();
   private sessionAccount: User | null = null;
 
@@ -215,25 +217,48 @@ class StorageService {
     if (options?.cloud !== false && collection) this.persistNow(collection, list);
   }
 
-  private persistNow(collection: RmsCollection, items: unknown) {
-    if (typeof window === 'undefined') return;
+  private persistNow(collection: RmsCollection, items: unknown): Promise<boolean> {
+    if (typeof window === 'undefined') return Promise.resolve(false);
     if (this.hydrating) {
       this.persistQueue.set(collection, items);
-      return;
+      return Promise.resolve(true);
     }
-    void fetch('/api/rms/workspace', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ collection, items })
-    }).then((response) => {
-      if (!response.ok) {
+    const run = async () => {
+      try {
+        const response = await fetch('/api/rms/workspace', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ collection, items })
+        });
+        const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!response.ok) {
+          this.lastPersistError = payload.error || `Save failed (${response.status}).`;
+          this.persistQueue.set(collection, items);
+          return false;
+        }
+        this.lastPersistError = '';
+        if (collection === 'users') {
+          void fetch('/api/auth/me', { credentials: 'include' });
+        }
+        return true;
+      } catch (error) {
+        this.lastPersistError = error instanceof Error ? error.message : 'Save failed.';
         this.persistQueue.set(collection, items);
-        return;
+        return false;
       }
-      if (collection === 'users') {
-        void fetch('/api/auth/me');
-      }
-    });
+    };
+    this.lastPersistPromise = run();
+    return this.lastPersistPromise;
+  }
+
+  public async waitForLastPersist(): Promise<boolean> {
+    if (!this.lastPersistPromise) return !this.lastPersistError;
+    return this.lastPersistPromise;
+  }
+
+  public getLastPersistError(): string {
+    return this.lastPersistError;
   }
 
   private flushPersistQueue() {

@@ -76,11 +76,17 @@ async function replaceOwnerRows(
   userId: string,
   rows: Record<string, unknown>[]
 ) {
-  const del = await supabase.from(table).delete().eq('owner_user_id', userId);
+  if (rows.length) {
+    const upsert = await supabase.from(table).upsert(rows, { onConflict: 'id' });
+    if (upsert.error) throw new Error(upsert.error.message);
+  }
+  const existing = await supabase.from(table).select('id').eq('owner_user_id', userId);
+  if (existing.error) throw new Error(existing.error.message);
+  const keep = new Set(rows.map((row) => String(row.id)));
+  const extra = (existing.data || []).map((row) => String(row.id)).filter((id) => !keep.has(id));
+  if (!extra.length) return;
+  const del = await supabase.from(table).delete().in('id', extra);
   if (del.error) throw new Error(del.error.message);
-  if (!rows.length) return;
-  const ins = await supabase.from(table).insert(rows);
-  if (ins.error) throw new Error(ins.error.message);
 }
 
 async function uploadDataUrl(
@@ -381,6 +387,7 @@ export async function writeCollection(
     reports: reportToRow as never
   };
   const mapFn = mapper[collection];
-  const rows = list.map((item) => mapFn(item as never, owner, companyId));
+  const company = String(companyId || '').trim() || null;
+  const rows = list.map((item) => mapFn(item as never, owner, company));
   await replaceOwnerRows(supabase, table, owner, rows);
 }
