@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -160,47 +160,57 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
     notify.success('Activity deleted', `${id} was removed.`);
   };
 
-  const persistActivity = useCallback(async () => {
-    if (!formData.title || !formData.date) return false;
-    const toSave: DailyActivity = {
-      id: formData.id || `ACT-2026-${Date.now()}`,
-      date: formData.date || new Date().toISOString().split('T')[0],
-      title: formData.title || '',
-      description: formData.description || '',
-      category: formData.category || 'ERP',
-      department: formData.department || defaultDepartment,
-      systemOrDevice: formData.systemOrDevice || '',
-      priority: (formData.priority as PriorityLevel) || 'Medium',
-      startTime: formData.startTime,
-      endTime: formData.endTime,
-      hoursSpent: Number(formData.hoursSpent) || 1,
-      status: (formData.status as ActivityStatus) || 'Completed',
-      actionTaken: formData.actionTaken || '',
-      resultOutcome: formData.resultOutcome || '',
-      businessImpact: formData.businessImpact || '',
-      relatedKpiId: formData.relatedKpiId,
-      evidenceLinks: formData.evidenceLinks || [],
-      evidenceFiles: formData.evidenceFiles || [],
-      lessonsLearned: formData.lessonsLearned,
-      createdBy: formData.createdBy || 'Imani Sambwe',
-      createdAt: formData.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    storage.saveActivity(toSave);
-    const saved = await storage.waitForLastPersist();
-    setActivities(storage.getActivities());
-    setFormData(toSave);
-    setEditingItem(toSave);
-    return saved;
-  }, [formData, defaultDepartment]);
+  const formDataRef = useRef(formData);
+  formDataRef.current = formData;
+  const persistChain = useRef(Promise.resolve(false));
 
-  useAutoSave(autoSave && isModalOpen, formData, () => {
+  const persistActivity = useCallback((options?: { syncForm?: boolean }) => {
+    persistChain.current = persistChain.current.catch(() => false).then(async () => {
+      const current = formDataRef.current;
+      if (!current.title || !current.date) return false;
+      const toSave: DailyActivity = {
+        id: current.id || `ACT-2026-${Date.now()}`,
+        date: current.date || new Date().toISOString().split('T')[0],
+        title: current.title || '',
+        description: current.description || '',
+        category: current.category || 'ERP',
+        department: current.department || defaultDepartment,
+        systemOrDevice: current.systemOrDevice || '',
+        priority: (current.priority as PriorityLevel) || 'Medium',
+        startTime: current.startTime,
+        endTime: current.endTime,
+        hoursSpent: Number(current.hoursSpent) || 1,
+        status: (current.status as ActivityStatus) || 'Completed',
+        actionTaken: current.actionTaken || '',
+        resultOutcome: current.resultOutcome || '',
+        businessImpact: current.businessImpact || '',
+        relatedKpiId: current.relatedKpiId,
+        evidenceLinks: current.evidenceLinks || [],
+        evidenceFiles: current.evidenceFiles || [],
+        lessonsLearned: current.lessonsLearned,
+        createdBy: current.createdBy || 'Imani Sambwe',
+        createdAt: current.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      storage.saveActivity(toSave);
+      const saved = await storage.waitForLastPersist();
+      setActivities(storage.getActivities());
+      if (options?.syncForm) {
+        setFormData(toSave);
+        setEditingItem(toSave);
+      }
+      return saved;
+    });
+    return persistChain.current;
+  }, [defaultDepartment]);
+
+  useAutoSave(autoSave && isModalOpen && Boolean(editingItem), formData, () => {
     void persistActivity();
   });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const saved = await persistActivity();
+    const saved = await persistActivity({ syncForm: true });
     setIsModalOpen(false);
     if (!saved) {
       notify.error(
@@ -393,8 +403,14 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                     step="0.5"
                     min="0.5"
                     required
-                    value={formData.hoursSpent}
-                    onChange={(e) => setFormData({ ...formData, hoursSpent: parseFloat(e.target.value) || 1 })}
+                    value={formData.hoursSpent ?? ''}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setFormData({
+                        ...formData,
+                        hoursSpent: raw === '' ? undefined : parseFloat(raw)
+                      });
+                    }}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
