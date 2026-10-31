@@ -110,14 +110,9 @@ export async function POST(request: Request) {
     const selected = managers.find((item) => item.id === requestedManagerId) || namedManager;
     if (selected) {
       managerId = selected.id;
-    } else if (managers.length > 0) {
-      return NextResponse.json(
-        { ok: false, error: 'Select your manager from the people already registered in this company.' },
-        { status: 400 }
-      );
     } else if (!typedName) {
       return NextResponse.json(
-        { ok: false, error: "Enter your manager's full name. They have not registered yet." },
+        { ok: false, error: "Type your manager's name. Pick them if they appear, or write the name if they are not in the system yet." },
         { status: 400 }
       );
     } else {

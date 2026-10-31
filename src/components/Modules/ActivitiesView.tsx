@@ -24,6 +24,7 @@ import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { draftDailyWork } from '@/lib/writeAssist';
 import { MultiPick, splitPicked } from '@/components/System/MultiPick';
+import { SuggestField } from '@/components/System/SuggestField';
 
 interface ActivitiesViewProps {
   selectedMonth: string;
@@ -252,25 +253,20 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <select
+          <SuggestField
+            className="w-40"
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
-
-          <select
+            onChange={setCategoryFilter}
+            placeholder="Category"
+            options={categories.map((c) => ({ value: c, label: c }))}
+          />
+          <SuggestField
+            className="w-40"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-          >
-            {statuses.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+            onChange={setStatusFilter}
+            placeholder="Status"
+            options={statuses.map((s) => ({ value: s, label: s }))}
+          />
         </div>
       </div>
 
@@ -438,30 +434,19 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as DailyActivity['category'] })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    {categories.filter((c) => c !== 'All').map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as ActivityStatus })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    {['Completed', 'In Progress', 'Planned', 'Blocked'].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
+                <SuggestField
+                  label="Category"
+                  value={String(formData.category || '')}
+                  onChange={(category) => setFormData({ ...formData, category: category as DailyActivity['category'] })}
+                  allowCustom
+                  options={categories.filter((c) => c !== 'All').map((c) => ({ value: c, label: c }))}
+                />
+                <SuggestField
+                  label="Status"
+                  value={String(formData.status || '')}
+                  onChange={(status) => setFormData({ ...formData, status: status as ActivityStatus })}
+                  options={['Completed', 'In Progress', 'Planned', 'Blocked'].map((s) => ({ value: s, label: s }))}
+                />
               </div>
 
               <MultiPick

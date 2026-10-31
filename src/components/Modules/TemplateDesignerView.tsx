@@ -11,6 +11,7 @@ import { ReportDocumentPreview } from '@/components/Reports/ReportDocumentPrevie
 import { useAppSession } from '@/context/AppSessionContext';
 import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
+import { SuggestField } from '@/components/System/SuggestField';
 
 const emptyTemplate = (): ReportTemplate => ({
   id: `TMPL-${Date.now()}`,
@@ -219,15 +220,17 @@ export const TemplateDesignerView: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-slate-400 font-semibold mb-1.5">Slide size</label>
-                <select
+                <SuggestField
+                  label="Slide size"
                   value={activeTemplate.slideFormat}
-                  onChange={(e) => setActiveTemplate({ ...activeTemplate, slideFormat: e.target.value as '16:9' | '4:3' })}
-                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white"
-                >
-                  <option value="16:9">16:9 Widescreen</option>
-                  <option value="4:3">4:3 Standard</option>
-                </select>
+                  onChange={(slideFormat) =>
+                    setActiveTemplate({ ...activeTemplate, slideFormat: slideFormat as '16:9' | '4:3' })
+                  }
+                  options={[
+                    { value: '16:9', label: '16:9 Widescreen' },
+                    { value: '4:3', label: '4:3 Standard' }
+                  ]}
+                />
               </div>
             </div>
             <div>

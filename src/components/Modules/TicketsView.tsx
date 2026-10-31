@@ -22,6 +22,7 @@ import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { draftTicketWriteup } from '@/lib/writeAssist';
 import { MultiPick, splitPicked } from '@/components/System/MultiPick';
+import { SuggestField } from '@/components/System/SuggestField';
 
 interface TicketsViewProps {
   selectedMonth: string;
@@ -243,25 +244,20 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <select
+          <SuggestField
+            className="w-40"
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-          >
-            {statuses.map((s) => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
-
-          <select
+            onChange={setStatusFilter}
+            placeholder="Status"
+            options={statuses.map((s) => ({ value: s, label: s }))}
+          />
+          <SuggestField
+            className="w-40"
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-          >
-            {categories.map((c) => (
-              <option key={c} value={c}>{c}</option>
-            ))}
-          </select>
+            onChange={setCategoryFilter}
+            placeholder="Category"
+            options={categories.map((c) => ({ value: c, label: c }))}
+          />
         </div>
       </div>
 
@@ -330,26 +326,15 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                         <span className="text-slate-400">Target: {tck.slaTargetHours}h</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <select
+                    <td className="py-3 px-4 text-center whitespace-nowrap min-w-[9rem]">
+                      <SuggestField
                         value={tck.status}
-                        onChange={(e) => handleStatusChange(tck, e.target.value as TicketStatus)}
-                        className={`text-[11px] px-2 py-1 rounded-lg font-bold border bg-slate-900 focus:outline-none ${
-                          tck.status === 'Resolved' || tck.status === 'Closed'
-                            ? 'text-emerald-400 border-emerald-500/30'
-                            : tck.status === 'In Progress'
-                            ? 'text-blue-400 border-blue-500/30'
-                            : tck.status === 'Awaiting Vendor'
-                            ? 'text-violet-400 border-violet-500/30'
-                            : 'text-amber-400 border-amber-500/30'
-                        }`}
-                      >
-                        {['Open', 'In Progress', 'Awaiting Vendor', 'Resolved', 'Closed'].map((s) => (
-                          <option key={s} value={s} className="bg-slate-900 text-white">
-                            {s}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(status) => handleStatusChange(tck, status as TicketStatus)}
+                        options={['Open', 'In Progress', 'Awaiting Vendor', 'Resolved', 'Closed'].map((s) => ({
+                          value: s,
+                          label: s
+                        }))}
+                      />
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
@@ -450,44 +435,28 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as TicketCategory })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    {categories.filter((c) => c !== 'All').map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Priority</label>
-                  <select
-                    value={formData.priority}
-                    onChange={(e) => setFormData({ ...formData, priority: e.target.value as PriorityLevel })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    {['Low', 'Medium', 'High', 'Critical'].map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({ ...formData, status: e.target.value as TicketStatus })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    {['Open', 'In Progress', 'Awaiting Vendor', 'Resolved', 'Closed'].map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
+                <SuggestField
+                  label="Category"
+                  value={String(formData.category || '')}
+                  onChange={(category) => setFormData({ ...formData, category: category as TicketCategory })}
+                  allowCustom
+                  options={categories.filter((c) => c !== 'All').map((c) => ({ value: c, label: c }))}
+                />
+                <SuggestField
+                  label="Priority"
+                  value={String(formData.priority || '')}
+                  onChange={(priority) => setFormData({ ...formData, priority: priority as PriorityLevel })}
+                  options={['Low', 'Medium', 'High', 'Critical'].map((p) => ({ value: p, label: p }))}
+                />
+                <SuggestField
+                  label="Status"
+                  value={String(formData.status || '')}
+                  onChange={(status) => setFormData({ ...formData, status: status as TicketStatus })}
+                  options={['Open', 'In Progress', 'Awaiting Vendor', 'Resolved', 'Closed'].map((s) => ({
+                    value: s,
+                    label: s
+                  }))}
+                />
               </div>
 
               <MultiPick

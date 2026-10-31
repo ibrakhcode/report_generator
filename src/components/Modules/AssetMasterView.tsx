@@ -6,6 +6,7 @@ import { AssetDefinition, AssetField, AssetFieldType, AssetRecord } from '@/type
 import { storage } from '@/services/storage';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 
 const FIELD_TYPES: AssetFieldType[] = ['text', 'number', 'date', 'textarea', 'select'];
 
@@ -259,17 +260,13 @@ export function AssetMasterView() {
                     placeholder="Field name"
                     className="sm:col-span-4 px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
                   />
-                  <select
-                    value={field.type}
-                    onChange={(e) => updateField(field.id, { type: e.target.value as AssetFieldType })}
-                    className="sm:col-span-3 px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-white"
-                  >
-                    {FIELD_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="sm:col-span-3">
+                    <SuggestField
+                      value={field.type}
+                      onChange={(type) => updateField(field.id, { type: type as AssetFieldType })}
+                      options={FIELD_TYPES.map((type) => ({ value: type, label: type }))}
+                    />
+                  </div>
                   {field.type === 'select' && (
                     <input
                       value={field.options || ''}
@@ -343,23 +340,17 @@ export function AssetMasterView() {
               </p>
             )}
             <div>
-              <label className="block text-xs text-slate-400 font-semibold mb-1">Asset type</label>
-              <select
+              <SuggestField
+                label="Asset type"
                 value={selectedType?.id || ''}
-                onChange={(e) => {
-                  setSelectedTypeId(e.target.value);
+                onChange={(next) => {
+                  setSelectedTypeId(next);
                   setEditingRecordId(null);
                   setRecordName('');
                   setRecordValues({});
                 }}
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
-              >
-                {definitions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
+                options={definitions.map((item) => ({ value: item.id, label: item.name }))}
+              />
             </div>
             {!selectedType && <p className="text-xs text-slate-500">Define an asset type first.</p>}
             {selectedType && (
@@ -393,22 +384,17 @@ export function AssetMasterView() {
                         className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
                       />
                     ) : field.type === 'select' ? (
-                      <select
+                      <SuggestField
                         value={recordValues[field.id] || ''}
-                        onChange={(e) => setRecordValues({ ...recordValues, [field.id]: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white"
-                      >
-                        <option value="">Select</option>
-                        {(field.options || '')
+                        onChange={(next) => setRecordValues({ ...recordValues, [field.id]: next })}
+                        allowCustom
+                        placeholder="Type or pick"
+                        options={(field.options || '')
                           .split(',')
                           .map((opt) => opt.trim())
                           .filter(Boolean)
-                          .map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                      </select>
+                          .map((opt) => ({ value: opt, label: opt }))}
+                      />
                     ) : (
                       <input
                         type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}

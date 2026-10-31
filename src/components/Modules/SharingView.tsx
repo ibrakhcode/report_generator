@@ -8,6 +8,7 @@ import { buildPptxBlob } from '../../services/pptxGenerator';
 import { downloadBlob } from '../../lib/reportTokens';
 import { useAppSession } from '@/context/AppSessionContext';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 
 interface SharingViewProps {
   selectedMonth: string;
@@ -162,21 +163,22 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
 
   const templateSelect = (
     <div>
-      <label className="block text-slate-400 font-semibold mb-1">Look / design template</label>
-      <select
+      <SuggestField
+        label="Look / design template"
         value={selectedTemplateId}
-        onChange={(e) => chooseTemplate(e.target.value)}
-        className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white"
-      >
-        {templates.length === 0 && <option value="">Save a template first</option>}
-        {templates.map((tmpl) => (
-          <option key={tmpl.id} value={tmpl.id}>
-            {tmpl.name}
-            {tmpl.uploadedTemplateName ? ` · ${tmpl.uploadedTemplateName}` : ''}
-            {tmpl.isDefault ? ' (default)' : ''}
-          </option>
-        ))}
-      </select>
+        onChange={chooseTemplate}
+        placeholder="Type a template name"
+        options={
+          templates.length === 0
+            ? [{ value: '', label: 'Save a template first' }]
+            : templates.map((tmpl) => ({
+                value: tmpl.id,
+                label: `${tmpl.name}${tmpl.uploadedTemplateName ? ` · ${tmpl.uploadedTemplateName}` : ''}${
+                  tmpl.isDefault ? ' (default)' : ''
+                }`
+              }))
+        }
+      />
     </div>
   );
 

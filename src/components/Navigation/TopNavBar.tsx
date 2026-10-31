@@ -7,6 +7,7 @@ import { User } from '../../types';
 import { storage } from '../../services/storage';
 import { useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { useAppSession } from '@/context/AppSessionContext';
+import { SuggestField } from '@/components/System/SuggestField';
 
 interface TopNavBarProps {
   activeModuleId: string;
@@ -98,34 +99,30 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
               <Radio className="relative w-2.5 h-2.5 text-emerald-400" />
             </span>
             <Building2 className="w-3.5 h-3.5 text-slate-400" />
-            <select
+            <SuggestField
+              compact
+              className="min-w-[8rem] max-w-[28vw] sm:max-w-[160px]"
               value={activeCompanyId}
-              onChange={(e) => setActiveCompanyId(e.target.value)}
-              className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer pr-1 font-medium max-w-[28vw] sm:max-w-[160px]"
-              title="Live working company"
-            >
-              {companies.map((company) => (
-                <option key={company.id} value={company.id} className="bg-slate-900 text-white">
-                  {company.id === activeCompanyId ? `Live · ${company.name}` : company.name}
-                </option>
-              ))}
-            </select>
+              onChange={setActiveCompanyId}
+              placeholder="Company"
+              options={companies.map((company) => ({
+                value: company.id,
+                label: company.id === activeCompanyId ? `Live · ${company.name}` : company.name
+              }))}
+            />
           </div>
         )}
 
         <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-slate-300">
           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-          <select
+          <SuggestField
+            compact
+            className="min-w-[8rem]"
             value={selectedMonth}
-            onChange={(e) => onSelectMonth(e.target.value)}
-            className="bg-transparent border-none text-xs text-slate-200 focus:outline-none cursor-pointer pr-1 font-medium"
-          >
-            {monthOptions.map((opt) => (
-              <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">
-                {opt.label}
-              </option>
-            ))}
-          </select>
+            onChange={onSelectMonth}
+            placeholder="Month"
+            options={monthOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+          />
         </div>
 
         <div className="flex items-center gap-2">

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ShieldCheck, Search, Download, Filter, Calendar } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { AuditLogEntry } from '../../types';
+import { SuggestField } from '@/components/System/SuggestField';
 
 export const AuditLogView: React.FC = () => {
   const [logs] = useState<AuditLogEntry[]>(() => storage.getAuditLogs());
@@ -77,15 +78,13 @@ export const AuditLogView: React.FC = () => {
           />
         </div>
 
-        <select
+        <SuggestField
+          className="w-44"
           value={actionFilter}
-          onChange={(e) => setActionFilter(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-        >
-          {actions.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
+          onChange={setActionFilter}
+          placeholder="Action"
+          options={actions.map((a) => ({ value: a, label: a }))}
+        />
       </div>
 
       <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">

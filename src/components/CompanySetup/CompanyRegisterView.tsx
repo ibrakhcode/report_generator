@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Building2, Clock, ShieldCheck, ArrowRight, Sparkles, AlertCircle, Mail, MapPin, CheckCircle2 } from 'lucide-react';
+import { Building2, ShieldCheck, ArrowRight, Sparkles, AlertCircle, Mail, MapPin, CheckCircle2 } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { auth } from '../../services/auth';
 import { AppSettings, User } from '../../types';
@@ -9,6 +9,7 @@ import { notify } from '@/lib/systemNotify';
 import { PublicAppearanceBar } from '@/components/System/PublicAppearanceBar';
 import type { DirectoryCompany } from '@/lib/companyName';
 import { namesMatch, normalizePersonName } from '@/lib/personName';
+import { SuggestField } from '@/components/System/SuggestField';
 
 interface CompanyRegisterViewProps {
   currentUser?: User | null;
@@ -39,6 +40,7 @@ export const CompanyRegisterView: React.FC<CompanyRegisterViewProps> = ({ curren
   const [setupMode, setSetupMode] = useState<'create' | 'join'>('create');
   const [joinCompanyId, setJoinCompanyId] = useState('');
   const [position, setPosition] = useState<'officer' | 'manager'>('officer');
+  const [positionText, setPositionText] = useState('IT Officer');
   const [selectedManagerId, setSelectedManagerId] = useState('');
   const [pendingManagerName, setPendingManagerName] = useState('');
   const [claimedManagerName, setClaimedManagerName] = useState(user?.fullName || '');
@@ -176,14 +178,35 @@ export const CompanyRegisterView: React.FC<CompanyRegisterViewProps> = ({ curren
     return hay === needle || hay.includes(needle) || needle.includes(hay);
   });
 
+  const applyPositionText = (next: string) => {
+    setPositionText(next === 'officer' ? 'IT Officer' : next === 'manager' ? 'Manager' : next);
+    if (next === 'officer' || next === 'IT Officer') setPosition('officer');
+    else if (next === 'manager' || next === 'Manager') setPosition('manager');
+    else setPosition(/manager|admin|head|supervisor/i.test(next) ? 'manager' : 'officer');
+  };
+
+  const applyManagerChoice = (next: string) => {
+    const byId = companyManagers.find((item) => item.id === next);
+    if (byId) {
+      setSelectedManagerId(byId.id);
+      setPendingManagerName('');
+      return;
+    }
+    const typed = next.startsWith('pending:') ? next.slice('pending:'.length) : next;
+    const named = companyManagers.find((item) => namesMatch(item.fullName, typed));
+    if (named) {
+      setSelectedManagerId(named.id);
+      setPendingManagerName('');
+      return;
+    }
+    setSelectedManagerId('');
+    setPendingManagerName(typed);
+  };
+
   const validateOrgRole = (): boolean => {
     if (position === 'officer') {
-      if (companyManagers.length > 0 && !selectedManagerId) {
-        setErrorMsg('Select your manager. They already have an account in this company.');
-        return false;
-      }
-      if (companyManagers.length === 0 && !pendingManagerName.trim()) {
-        setErrorMsg("Enter your manager's full name. They have not registered yet.");
+      if (!selectedManagerId && !pendingManagerName.trim()) {
+        setErrorMsg("Type your manager's name. Pick them if they appear, or write the name if they are not registered yet.");
         return false;
       }
     } else if (!claimedManagerName.trim()) {
@@ -302,82 +325,57 @@ export const CompanyRegisterView: React.FC<CompanyRegisterViewProps> = ({ curren
 
   const orgRoleFields = (
     <div className="rounded-2xl border border-slate-700 bg-slate-800/40 p-4 space-y-3">
-      <div>
-        <label className="text-slate-300 font-semibold mb-1 block">Your position <span className="text-rose-400">*</span></label>
-        <select
-          value={position}
-          onChange={(e) => setPosition(e.target.value as 'officer' | 'manager')}
-          className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
-        >
-          <option value="officer">IT Officer</option>
-          <option value="manager">Manager</option>
-        </select>
-      </div>
-      {position === 'officer' && companyManagers.length > 0 && (
-        <div>
-          <label className="text-slate-300 font-semibold mb-1 block">Your manager <span className="text-rose-400">*</span></label>
-          <select
-            value={selectedManagerId}
-            onChange={(e) => setSelectedManagerId(e.target.value)}
-            className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
-          >
-            <option value="">Select your manager</option>
-            {companyManagers.map((manager) => (
-              <option key={manager.id} value={manager.id}>
-                {manager.fullName}
-                {manager.title ? ` — ${manager.title}` : ''}
-              </option>
-            ))}
-          </select>
-          <p className="text-[11px] text-slate-500 mt-1">This person already has an account in this company.</p>
-        </div>
-      )}
-      {position === 'officer' && companyManagers.length === 0 && (
-        <div>
-          <label className="text-slate-300 font-semibold mb-1 block">Manager&apos;s full name <span className="text-rose-400">*</span></label>
-          <input
-            type="text"
-            value={pendingManagerName}
-            onChange={(e) => setPendingManagerName(e.target.value)}
-            placeholder="Type the manager&apos;s full name"
-            className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
-          />
-          <p className="text-[11px] text-slate-500 mt-1">
-            No manager account exists yet. Enter their name so they can be linked when they register.
-          </p>
-        </div>
+      <SuggestField
+        label="Your position"
+        required
+        value={positionText === 'IT Officer' ? 'officer' : positionText === 'Manager' ? 'manager' : positionText}
+        onChange={applyPositionText}
+        allowCustom
+        placeholder="Type Manager or IT Officer"
+        options={[
+          { value: 'officer', label: 'IT Officer' },
+          { value: 'manager', label: 'Manager' }
+        ]}
+        hint="Type to search. If your title is not listed, write it."
+      />
+      {position === 'officer' && (
+        <SuggestField
+          label="Your manager"
+          required
+          value={selectedManagerId || pendingManagerName}
+          onChange={applyManagerChoice}
+          allowCustom
+          placeholder="Type the manager's full name"
+          options={[
+            ...companyManagers.map((manager) => ({
+              value: manager.id,
+              label: manager.fullName,
+              hint: manager.title || manager.email
+            })),
+            ...pendingManagerNames.map((name) => ({
+              value: `pending:${name}`,
+              label: name,
+              hint: 'Not registered yet'
+            }))
+          ]}
+          hint="If they appear, pick them. If they are not in the system, write their name."
+        />
       )}
       {position === 'manager' && (
-        <div>
-          <label className="text-slate-300 font-semibold mb-1 block">Your full name <span className="text-rose-400">*</span></label>
-          <input
-            type="text"
-            value={claimedManagerName}
-            onChange={(e) => setClaimedManagerName(e.target.value)}
-            className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
-          />
-          {nameSuggestions.length > 0 && (
-            <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-950/30 p-3 space-y-2">
-              <p className="text-[11px] font-semibold text-amber-300">
-                Officers already listed this name as their manager. Choose the matching name.
-              </p>
-              {nameSuggestions.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  onClick={() => setClaimedManagerName(name)}
-                  className={`w-full text-left rounded-lg border px-3 py-2 ${
-                    namesMatch(name, claimedManagerName)
-                      ? 'border-amber-400 bg-slate-900 text-white'
-                      : 'border-slate-700 bg-slate-900 text-slate-200 hover:border-amber-400'
-                  }`}
-                >
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <SuggestField
+          label="Your full name"
+          required
+          value={claimedManagerName}
+          onChange={setClaimedManagerName}
+          allowCustom
+          placeholder="Type your full name"
+          options={nameSuggestions.map((name) => ({
+            value: name,
+            label: name,
+            hint: 'Officers already listed this name'
+          }))}
+          hint="If officers already typed your name, pick the matching suggestion."
+        />
       )}
     </div>
   );
@@ -474,27 +472,22 @@ export const CompanyRegisterView: React.FC<CompanyRegisterViewProps> = ({ curren
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           {setupMode === 'join' && directory.length > 0 && (
             <div>
-              <label className="text-slate-300 font-semibold mb-1 block">Existing companies</label>
-              <select
+              <SuggestField
+                label="Existing companies"
                 value={joinCompanyId}
-                onChange={(e) => {
-                  const next = directory.find((item) => item.id === e.target.value);
-                  setJoinCompanyId(e.target.value);
-                  if (next) applyCompanyDetails(next);
+                onChange={(next) => {
+                  setJoinCompanyId(next);
+                  const selected = directory.find((item) => item.id === next);
+                  if (selected) applyCompanyDetails(selected);
                 }}
-                className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-white"
-              >
-                {directory.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                    {company.shortCode ? ` (${company.shortCode})` : ''}
-                    {company.headquarters ? ` — ${company.headquarters}` : ''}
-                  </option>
-                ))}
-              </select>
-              <p className="text-[11px] text-slate-500 mt-1">
-                Join for company name and branding only. Daily work, tickets, and reports stay on your own empty workspace.
-              </p>
+                placeholder="Type a company name"
+                options={directory.map((company) => ({
+                  value: company.id,
+                  label: company.name,
+                  hint: [company.shortCode, company.headquarters].filter(Boolean).join(' · ')
+                }))}
+                hint="Join for company name and branding only. Daily work, tickets, and reports stay on your own empty workspace."
+              />
               <div className="mt-4">{orgRoleFields}</div>
               <button
                 type="submit"
@@ -599,19 +592,17 @@ export const CompanyRegisterView: React.FC<CompanyRegisterViewProps> = ({ curren
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Business Timezone</span>
-              </label>
-              <select
+              <SuggestField
+                label="Business Timezone"
                 value={businessTimezone}
-                onChange={(e) => setBusinessTimezone(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-teal-500 text-xs shadow-inner"
-              >
-                <option value="Africa/Dar_es_Salaam">Africa/Dar_es_Salaam (EAT, UTC+3)</option>
-                <option value="Africa/Nairobi">Africa/Nairobi (EAT, UTC+3)</option>
-                <option value="UTC">Universal Time Coordinated (UTC)</option>
-              </select>
+                onChange={setBusinessTimezone}
+                placeholder="Type a timezone"
+                options={[
+                  { value: 'Africa/Dar_es_Salaam', label: 'Africa/Dar_es_Salaam (EAT, UTC+3)' },
+                  { value: 'Africa/Nairobi', label: 'Africa/Nairobi (EAT, UTC+3)' },
+                  { value: 'UTC', label: 'Universal Time Coordinated (UTC)' }
+                ]}
+              />
             </div>
           </div>
 

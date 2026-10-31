@@ -33,6 +33,7 @@ import {
 import { KpiItem, KpiCalculationType } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 
 // Month-over-Month historical performance trend data
 const MOM_KPI_TREND_DATA = [
@@ -536,17 +537,18 @@ export const KpiView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Unit</label>
-                  <select
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value as KpiItem['unit'] })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    <option value="%">%</option>
-                    <option value="Hours">Hours</option>
-                    <option value="Count">Count</option>
-                    <option value="Rating">Rating (1-5)</option>
-                  </select>
+                  <SuggestField
+                    label="Unit"
+                    value={String(formData.unit || '')}
+                    onChange={(unit) => setFormData({ ...formData, unit: unit as KpiItem['unit'] })}
+                    allowCustom
+                    options={[
+                      { value: '%', label: '%' },
+                      { value: 'Hours', label: 'Hours' },
+                      { value: 'Count', label: 'Count' },
+                      { value: 'Rating', label: 'Rating (1-5)' }
+                    ]}
+                  />
                 </div>
               </div>
 
@@ -564,15 +566,17 @@ export const KpiView: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">Calculation Method</label>
-                  <select
-                    value={formData.calculationType}
-                    onChange={(e) => setFormData({ ...formData, calculationType: e.target.value as KpiCalculationType })}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                  >
-                    <option value="HigherIsBetter">Higher is Better (e.g. Uptime %)</option>
-                    <option value="LowerIsBetter">Lower is Better (e.g. SLA Hours)</option>
-                  </select>
+                  <SuggestField
+                    label="Calculation Method"
+                    value={String(formData.calculationType || '')}
+                    onChange={(calculationType) =>
+                      setFormData({ ...formData, calculationType: calculationType as KpiCalculationType })
+                    }
+                    options={[
+                      { value: 'HigherIsBetter', label: 'Higher is Better (e.g. Uptime %)' },
+                      { value: 'LowerIsBetter', label: 'Lower is Better (e.g. SLA Hours)' }
+                    ]}
+                  />
                 </div>
               </div>
 

@@ -5,6 +5,7 @@ import { Layers, Plus, CheckSquare, Clock, Calendar, CheckCircle2, ChevronRight,
 import { ProjectImprovement, ProjectMilestone } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 
 export const ProjectsView: React.FC = () => {
   const [projects, setProjects] = useState<ProjectImprovement[]>(() => storage.getProjects());
@@ -265,28 +266,27 @@ export const ProjectsView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Who will perform this project</label>
-                <select
+                <SuggestField
+                  label="Who will perform this project"
                   required
                   value={formData.assignedUserId || ''}
-                  onChange={(e) => {
-                    const selected = users.find((user) => user.id === e.target.value);
+                  onChange={(next) => {
+                    const selected = users.find((user) => user.id === next);
                     setFormData({
                       ...formData,
-                      assignedUserId: e.target.value,
-                      assignedUserName: selected?.fullName || '',
-                      owner: selected?.fullName || ''
+                      assignedUserId: next,
+                      assignedUserName: selected?.fullName || next,
+                      owner: selected?.fullName || next
                     });
                   }}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                >
-                  <option value="">Select user</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.fullName} ({user.email})
-                    </option>
-                  ))}
-                </select>
+                  allowCustom
+                  placeholder="Type a name"
+                  options={users.map((user) => ({
+                    value: user.id,
+                    label: user.fullName,
+                    hint: user.email
+                  }))}
+                />
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">

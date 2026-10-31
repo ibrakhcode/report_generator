@@ -7,6 +7,7 @@ import { storage } from '../../services/storage';
 import { UI_FONTS, UI_THEMES, applyAppearance } from '../../lib/appearance';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 import { auth } from '@/services/auth';
 
 export const SettingsView: React.FC = () => {
@@ -92,17 +93,18 @@ export const SettingsView: React.FC = () => {
             <span>Office security</span>
           </h3>
           <div>
-            <label className="block text-slate-400 font-semibold mb-1">Idle lock</label>
-            <select
-              value={settings.idleTimeoutMinutes || 15}
-              onChange={(e) => setSettings({ ...settings, idleTimeoutMinutes: Number(e.target.value) })}
-              className="w-full max-w-xs px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white"
-            >
-              <option value={5}>5 minutes</option>
-              <option value={15}>15 minutes</option>
-              <option value={30}>30 minutes</option>
-              <option value={60}>60 minutes</option>
-            </select>
+            <SuggestField
+              label="Idle lock"
+              className="max-w-xs"
+              value={String(settings.idleTimeoutMinutes || 15)}
+              onChange={(next) => setSettings({ ...settings, idleTimeoutMinutes: Number(next) })}
+              options={[
+                { value: '5', label: '5 minutes' },
+                { value: '15', label: '15 minutes' },
+                { value: '30', label: '30 minutes' },
+                { value: '60', label: '60 minutes' }
+              ]}
+            />
             <p className="text-[11px] text-slate-500 mt-1">Locks this screen after no mouse or keyboard use. Password unlocks it.</p>
           </div>
         </div>
@@ -234,16 +236,16 @@ export const SettingsView: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-400 font-semibold mb-1">Business Timezone</label>
-              <select
+              <SuggestField
+                label="Business Timezone"
                 value={settings.businessTimezone}
-                onChange={(e) => setSettings({ ...settings, businessTimezone: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none"
-              >
-                <option value="Africa/Dar_es_Salaam">Africa/Dar_es_Salaam (EAT, UTC+3)</option>
-                <option value="Africa/Nairobi">Africa/Nairobi (EAT, UTC+3)</option>
-                <option value="UTC">Universal Time Coordinated (UTC)</option>
-              </select>
+                onChange={(businessTimezone) => setSettings({ ...settings, businessTimezone })}
+                options={[
+                  { value: 'Africa/Dar_es_Salaam', label: 'Africa/Dar_es_Salaam (EAT, UTC+3)' },
+                  { value: 'Africa/Nairobi', label: 'Africa/Nairobi (EAT, UTC+3)' },
+                  { value: 'UTC', label: 'Universal Time Coordinated (UTC)' }
+                ]}
+              />
             </div>
             <div>
               <label className="block text-slate-400 font-semibold mb-1">Ticket SLA Window (Hours)</label>
@@ -267,20 +269,22 @@ export const SettingsView: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-400 font-semibold mb-1">Provider Engine</label>
-              <select
+              <SuggestField
+                label="Provider Engine"
                 value={settings.emailService.provider}
-                onChange={(e) => setSettings({
-                  ...settings,
-                  emailService: { ...settings.emailService, provider: e.target.value as AppSettings['emailService']['provider'] }
-                })}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none"
-              >
-                <option value="Simulation">Built-in Dispatch Simulator</option>
-                <option value="SMTP">Corporate SMTP (hesu.co.tz)</option>
-                <option value="Resend">Resend API</option>
-                <option value="SendGrid">SendGrid</option>
-              </select>
+                onChange={(provider) =>
+                  setSettings({
+                    ...settings,
+                    emailService: { ...settings.emailService, provider: provider as AppSettings['emailService']['provider'] }
+                  })
+                }
+                options={[
+                  { value: 'Simulation', label: 'Built-in Dispatch Simulator' },
+                  { value: 'SMTP', label: 'Corporate SMTP (hesu.co.tz)' },
+                  { value: 'Resend', label: 'Resend API' },
+                  { value: 'SendGrid', label: 'SendGrid' }
+                ]}
+              />
             </div>
             <div>
               <label className="block text-slate-400 font-semibold mb-1">Sender Email</label>

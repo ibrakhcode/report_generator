@@ -5,6 +5,7 @@ import { FolderGit2, Upload, File, Download, Trash2, Search, Filter, Paperclip, 
 import { EvidenceFile } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 
 export const EvidenceView: React.FC = () => {
   const [evidenceList, setEvidenceList] = useState<EvidenceFile[]>(() => storage.getEvidence());
@@ -109,15 +110,13 @@ export const EvidenceView: React.FC = () => {
           />
         </div>
 
-        <select
+        <SuggestField
+          className="w-44"
           value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
-        >
-          {categories.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+          onChange={setCategoryFilter}
+          placeholder="Category"
+          options={categories.map((c) => ({ value: c, label: c }))}
+        />
       </div>
 
       {filtered.length === 0 ? (
@@ -200,16 +199,13 @@ export const EvidenceView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value as EvidenceFile['category'] })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                >
-                  {categories.filter((c) => c !== 'All').map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                <SuggestField
+                  label="Category"
+                  value={String(formData.category || '')}
+                  onChange={(category) => setFormData({ ...formData, category: category as EvidenceFile['category'] })}
+                  allowCustom
+                  options={categories.filter((c) => c !== 'All').map((c) => ({ value: c, label: c }))}
+                />
               </div>
 
               <div>

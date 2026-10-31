@@ -5,6 +5,7 @@ import { Cpu, Plus, AlertCircle, CheckCircle2, ShieldCheck, X } from 'lucide-rea
 import { BusinessSystemIssue } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 
 export const SapSystemsView: React.FC = () => {
   const [issues, setIssues] = useState<BusinessSystemIssue[]>(() => storage.getSapIssues());
@@ -165,18 +166,22 @@ export const SapSystemsView: React.FC = () => {
 
             <form onSubmit={handleSave} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-400 font-semibold mb-1">System Name</label>
-                <select
-                  value={formData.systemName}
-                  onChange={(e) => setFormData({ ...formData, systemName: e.target.value as BusinessSystemIssue['systemName'] })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none"
-                >
-                  <option value="SAP Business One">SAP Business One</option>
-                  <option value="VNV Integration">VNV Integration</option>
-                  <option value="Microsoft 365">Microsoft 365</option>
-                  <option value="Cisco & Fortinet Network">Cisco & Fortinet Network</option>
-                  <option value="Biometric Attendance">Biometric Attendance</option>
-                </select>
+                <SuggestField
+                  label="System Name"
+                  value={String(formData.systemName || '')}
+                  onChange={(systemName) =>
+                    setFormData({ ...formData, systemName: systemName as BusinessSystemIssue['systemName'] })
+                  }
+                  allowCustom
+                  placeholder="Type a system name"
+                  options={[
+                    { value: 'SAP Business One', label: 'SAP Business One' },
+                    { value: 'VNV Integration', label: 'VNV Integration' },
+                    { value: 'Microsoft 365', label: 'Microsoft 365' },
+                    { value: 'Cisco & Fortinet Network', label: 'Cisco & Fortinet Network' },
+                    { value: 'Biometric Attendance', label: 'Biometric Attendance' }
+                  ]}
+                />
               </div>
 
               <div>

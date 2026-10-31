@@ -17,6 +17,7 @@ import { ReportDocumentPreview } from '@/components/Reports/ReportDocumentPrevie
 import { ReportPdfPreview } from '@/components/Reports/ReportPdfPreview';
 import { BUNDLED_DEFAULT_PPTX_NAME, BUNDLED_DEFAULT_TEMPLATE_ID } from '@/lib/templateFileStore';
 import { notify } from '@/lib/systemNotify';
+import { SuggestField } from '@/components/System/SuggestField';
 
 interface MonthlyReportsViewProps {
   selectedMonth: string;
@@ -96,23 +97,21 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
             Design comes from the selected template. Numbers and tables come from Daily Work, Helpdesk, and Projects for {selectedMonth}.
           </p>
           <div className="pt-2">
-            <label className="block text-[11px] text-blue-200 font-semibold mb-1">Look / design template</label>
-            <select
+            <SuggestField
+              label="Look / design template"
+              className="max-w-md"
               value={selectedTemplateId}
-              onChange={(e) => {
-                setSelectedTemplateId(e.target.value);
-                sessionStorage.setItem('hesu_selected_template_id', e.target.value);
-                storage.saveReport({ ...report, selectedTemplateId: e.target.value });
+              onChange={(next) => {
+                setSelectedTemplateId(next);
+                sessionStorage.setItem('hesu_selected_template_id', next);
+                storage.saveReport({ ...report, selectedTemplateId: next });
               }}
-              className="w-full max-w-md px-3 py-2 bg-slate-950/60 border border-blue-700/50 rounded-xl text-xs text-white"
-            >
-              {templates.map((tmpl) => (
-                <option key={tmpl.id} value={tmpl.id}>
-                  {tmpl.name}
-                  {tmpl.isDefault ? ' (default)' : ''}
-                </option>
-              ))}
-            </select>
+              placeholder="Type a template name"
+              options={templates.map((tmpl) => ({
+                value: tmpl.id,
+                label: `${tmpl.name}${tmpl.isDefault ? ' (default)' : ''}`
+              }))}
+            />
           </div>
         </div>
 

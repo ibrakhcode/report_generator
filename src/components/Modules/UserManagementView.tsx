@@ -23,6 +23,7 @@ import { storage } from '../../services/storage';
 import { auth, DEFAULT_ADMIN_EMAIL } from '../../services/auth';
 import { notify } from '@/lib/systemNotify';
 import { ADMIN_ONLY_MODULE_IDS, MANAGER_ONLY_MODULE_IDS, isManagerRole } from '@/context/AppSessionContext';
+import { SuggestField } from '@/components/System/SuggestField';
 import { APP_MODULES, AppModule } from '../Navigation/ModuleRegistry';
 
 interface UserManagementViewProps {
@@ -506,11 +507,11 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-slate-400 font-semibold mb-1">System Role</label>
-                  <select
+                  <SuggestField
+                    label="System Role"
                     value={formData.role || 'editor'}
-                    onChange={(e) => {
-                      const newRole = e.target.value as UserRole;
+                    onChange={(next) => {
+                      const newRole = next as UserRole;
                       setFormData({
                         ...formData,
                         role: newRole,
@@ -522,13 +523,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                               : (formData.allowedModules || []).filter((id) => !MANAGER_ONLY_MODULE_IDS.includes(id))
                       });
                     }}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none capitalize"
-                  >
-                    <option value="editor">IT Officer (Staff)</option>
-                    <option value="manager">Manager</option>
-                    <option value="viewer">Viewer (Read-only)</option>
-                    <option value="admin">Administrator</option>
-                  </select>
+                    options={[
+                      { value: 'editor', label: 'IT Officer (Staff)' },
+                      { value: 'manager', label: 'Manager' },
+                      { value: 'viewer', label: 'Viewer (Read-only)' },
+                      { value: 'admin', label: 'Administrator' }
+                    ]}
+                  />
                 </div>
 
                 <div>
