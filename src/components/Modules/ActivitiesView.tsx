@@ -558,14 +558,6 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
           <DetailRow label="Result / outcome" value={viewingItem.resultOutcome} />
           <DetailRow label="Business impact" value={viewingItem.businessImpact} />
           <DetailRow label="Related KPI" value={viewingItem.relatedKpiId} />
-          <DetailRow label="Related project" value={viewingItem.relatedProjectId} />
-          <DetailRow label="Related ticket" value={viewingItem.relatedTicketId} />
-          <DetailRow label="Next action" value={viewingItem.nextAction} />
-          <DetailRow label="Due date" value={viewingItem.dueDate} />
-          <DetailRow label="Lessons learned" value={viewingItem.lessonsLearned} />
-          <DetailRow label="Evidence links" value={viewingItem.evidenceLinks?.filter(Boolean).join(', ')} />
-          <DetailRow label="Evidence files" value={viewingItem.evidenceFiles?.filter(Boolean).join(', ')} />
-          <DetailRow label="Created by" value={viewingItem.createdBy} />
           <DetailRow label="Created" value={viewingItem.createdAt} />
           <DetailRow label="Updated" value={viewingItem.updatedAt} />
         </RecordDetailDialog>

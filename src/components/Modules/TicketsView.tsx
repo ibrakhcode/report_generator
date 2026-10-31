@@ -529,33 +529,16 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
             setViewingTicket(null);
           }}
         >
-          <DetailRow label="Reported" value={new Date(viewingTicket.reportedAt).toLocaleString('en-GB')} />
+          <DetailRow label="Requester" value={viewingTicket.requesterName} />
+          <DetailRow label="Departments" value={viewingTicket.department} />
           <DetailRow label="Title" value={viewingTicket.title} />
           <DetailRow label="Description" value={viewingTicket.description} />
-          <DetailRow label="Requester" value={viewingTicket.requesterName} />
-          <DetailRow label="Email" value={viewingTicket.requesterEmail} />
-          <DetailRow label="Departments" value={viewingTicket.department} />
           <DetailRow label="Category" value={viewingTicket.category} />
-          <DetailRow label="Assets / systems" value={viewingTicket.applicationOrDevice} />
           <DetailRow label="Priority" value={viewingTicket.priority} />
           <DetailRow label="Status" value={viewingTicket.status} />
-          <DetailRow label="Technician" value={viewingTicket.assignedTechnician} />
+          <DetailRow label="Assets / systems" value={viewingTicket.applicationOrDevice} />
           <DetailRow label="Actions taken" value={viewingTicket.actionsTaken} />
           <DetailRow label="Root cause" value={viewingTicket.rootCause} />
-          <DetailRow label="Resolution" value={viewingTicket.resolution} />
-          <DetailRow label="SLA target" value={`${viewingTicket.slaTargetHours}h`} />
-          <DetailRow
-            label="Resolution hours"
-            value={viewingTicket.resolutionHours !== undefined ? `${viewingTicket.resolutionHours}h` : ''}
-          />
-          <DetailRow label="SLA breached" value={viewingTicket.slaBreached ? 'Yes' : 'No'} />
-          <DetailRow label="Resolved at" value={viewingTicket.resolvedAt} />
-          <DetailRow label="Related activity" value={viewingTicket.relatedActivityId} />
-          <DetailRow label="Feedback" value={viewingTicket.userFeedback} />
-          <DetailRow label="Escalation notes" value={viewingTicket.escalationNotes} />
-          <DetailRow label="Evidence files" value={viewingTicket.evidenceFiles?.filter(Boolean).join(', ')} />
-          <DetailRow label="Created" value={viewingTicket.createdAt} />
-          <DetailRow label="Updated" value={viewingTicket.updatedAt} />
         </RecordDetailDialog>
       )}
     </div>
