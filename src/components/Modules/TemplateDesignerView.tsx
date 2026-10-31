@@ -104,8 +104,8 @@ export const TemplateDesignerView: React.FC = () => {
         setTemplates(storage.getTemplates());
         flash(
           detected.length
-            ? `Template saved. Tokens found: ${detected.join(', ')}`
-            : 'Template saved. Add tokens such as {{COMPANY_NAME}} in the PPTX, then upload again.'
+            ? `Template saved. Live tokens found: ${detected.join(', ')}. Delivery will also rearrange headings.`
+            : 'Template saved as-is. Delivery will rearrange headings and fill live report content.'
         );
       } catch (err) {
         flash(err instanceof Error ? err.message : 'Could not save the uploaded template.');
@@ -259,7 +259,7 @@ export const TemplateDesignerView: React.FC = () => {
               Upload PPTX template
             </h3>
             <p className="text-xs text-slate-300">
-              Optional. If you upload a PPTX, put tokens in the slides. The system replaces them with live report data.
+              Upload any PowerPoint. Layout and style stay. Headings are rearranged and wording is filled with this month&apos;s live report.
             </p>
             <p className="text-[11px] text-slate-400 font-mono break-all">
               {REPORT_PLACEHOLDERS.map((token) => `{{${token}}}`).join('  ')}

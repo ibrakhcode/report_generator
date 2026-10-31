@@ -243,21 +243,22 @@ export function rowToIssue(row: Record<string, unknown>): BusinessSystemIssue {
 }
 
 export function projectToRow(item: ProjectImprovement, userId: string, companyId: string | null) {
+  const company = String(companyId || '').trim() || null;
   return {
     id: item.id,
     owner_user_id: userId,
-    company_id: companyId,
+    company_id: company,
     name: item.name,
     objective: item.objective || '',
     business_justification: item.businessJustification || '',
     start_date: dateOrNull(item.startDate),
     target_completion_date: dateOrNull(item.targetCompletionDate),
     owner: item.owner || '',
-    assigned_user_id: item.assignedUserId || null,
+    assigned_user_id: String(item.assignedUserId || '').trim() || null,
     assigned_user_name: item.assignedUserName || '',
     my_responsibilities: item.myResponsibilities || '',
     status: item.status || '',
-    milestones: item.milestones || [],
+    milestones: Array.isArray(item.milestones) ? item.milestones : [],
     progress_percent: num(item.progressPercent),
     risks_and_dependencies: item.risksAndDependencies || '',
     estimated_cost: item.estimatedCost || '',
@@ -265,8 +266,8 @@ export function projectToRow(item: ProjectImprovement, userId: string, companyId
     approval_status: item.approvalStatus || '',
     evidence_files: item.evidenceFiles || [],
     lessons_learned: item.lessonsLearned || '',
-    created_at: item.createdAt,
-    updated_at: item.updatedAt
+    created_at: item.createdAt || new Date().toISOString(),
+    updated_at: item.updatedAt || new Date().toISOString()
   };
 }
 

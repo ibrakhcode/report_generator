@@ -108,6 +108,49 @@ export async function detectPptxPlaceholders(dataUrl: string): Promise<string[]>
   return Array.from(found);
 }
 
+const LIVE_SLIDE_PLAN: { heading: string; body: (keyof ReturnType<typeof buildReportTokens>)[] }[] = [
+  { heading: 'ICT Monthly Performance Report', body: ['COMPANY_NAME', 'TITLE', 'PERIOD', 'DEPARTMENT', 'PREPARED_BY'] },
+  { heading: 'Executive Summary', body: ['EXECUTIVE_SUMMARY'] },
+  { heading: 'Daily Work', body: ['DAILY_WORK', 'ACTIVITY_COUNT'] },
+  { heading: 'IT Support Tickets', body: ['TICKETS', 'TICKET_COUNT', 'SLA_PERCENT'] },
+  { heading: 'Projects', body: ['PROJECTS', 'PROJECT_COUNT'] },
+  { heading: 'KPIs', body: ['KPIS', 'KPI_SCORE'] },
+  { heading: 'Staff Training', body: ['TRAINING'] },
+  { heading: 'Achievements', body: ['ACHIEVEMENTS'] },
+  { heading: 'Outstanding Issues', body: ['ISSUES'] },
+  { heading: 'Recommendations', body: ['RECOMMENDATIONS'] },
+  { heading: 'Next Month Priorities', body: ['PRIORITIES'] }
+];
+
+function replaceTextRuns(xml: string, values: string[]): string {
+  let index = 0;
+  const filled = xml.replace(/<a:t([^>]*)>([\s\S]*?)<\/a:t>/g, (_full, attrs: string) => {
+    const next = values[index] ?? (index === 0 ? values[0] : ' ');
+    index += 1;
+    return `<a:t${attrs}>${xmlSafe(next || ' ')}</a:t>`;
+  });
+  return filled;
+}
+
+function applyLiveSlideLayout(xml: string, heading: string, body: string): string {
+  const runs = xml.match(/<a:t([^>]*)>([\s\S]*?)<\/a:t>/g) || [];
+  if (!runs.length) return xml;
+  if (runs.length === 1) {
+    return replaceTextRuns(xml, [`${heading}: ${body}`]);
+  }
+  const values = runs.map((_, i) => {
+    if (i === 0) return heading;
+    if (i === runs.length - 1) return body;
+    return ' ';
+  });
+  return replaceTextRuns(xml, values);
+}
+
+function slideNumber(name: string): number {
+  const match = name.match(/slide(\d+)\.xml$/i);
+  return match ? Number(match[1]) : 0;
+}
+
 export async function fillPptxTemplate(dataUrl: string, report: MonthlyReportData): Promise<Blob> {
   const JSZip = (await import('jszip')).default;
   const zip = await JSZip.loadAsync(await dataUrlToBuffer(dataUrl));
@@ -118,7 +161,22 @@ export async function fillPptxTemplate(dataUrl: string, report: MonthlyReportDat
     const xml = await zip.files[name].async('string');
     zip.file(name, replacePlaceholdersInXml(xml, tokens));
   }
-  return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+  const slides = names
+    .filter((name) => /ppt\/slides\/slide\d+\.xml$/i.test(name))
+    .sort((a, b) => slideNumber(a) - slideNumber(b));
+  for (let index = 0; index < slides.length; index += 1) {
+    const name = slides[index];
+    const plan = LIVE_SLIDE_PLAN[Math.min(index, LIVE_SLIDE_PLAN.length - 1)];
+    const body = plan.body.map((key) => tokens[key]).filter(Boolean).join('\n');
+    const file = zip.file(name);
+    if (!file) continue;
+    const xml = await file.async('string');
+    zip.file(name, applyLiveSlideLayout(xml, plan.heading, body));
+  }
+  return zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  });
 }
 
 async function readPptxXml(dataUrl: string): Promise<string[]> {

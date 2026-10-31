@@ -247,6 +247,19 @@ class AuthService {
     return { success: true };
   }
 
+  public async requestPasswordResetEmail(email: string): Promise<{ success: boolean; error?: string }> {
+    const remote = await fetch('/api/auth/forgot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim().toLowerCase() })
+    });
+    const payload = (await remote.json()) as { ok?: boolean; error?: string };
+    if (!remote.ok) {
+      return { success: false, error: payload.error || 'Could not send the reset email.' };
+    }
+    return { success: true };
+  }
+
   public async resetPasswordWithCode(email: string, recoveryCode: string, newPassword: string): Promise<{ success: boolean; error?: string; newRecoveryCode?: string }> {
     const remote = await fetch('/api/auth/reset', {
       method: 'POST',

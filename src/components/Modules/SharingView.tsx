@@ -133,29 +133,18 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
           to: recipientEmail,
           subject: emailSubject,
           text: emailBody,
-          fromEmail: settings.emailService.fromEmail,
-          fromName: settings.emailService.fromName,
-          provider: settings.emailService.provider,
-          apiKey: settings.emailService.apiKeyOrPass,
           attachments
         })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Email send failed');
-      if (data.channel === 'mailto') {
-        for (const file of attachments) {
-          const bytes = Uint8Array.from(atob(file.content), (c) => c.charCodeAt(0));
-          downloadBlob(new Blob([bytes], { type: file.mime }), file.filename);
-        }
-        window.location.href = `mailto:${encodeURIComponent(recipientEmail)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
-        setEmailSentStatus(`Report generated. Your email app opened for ${recipientEmail}. Attach the downloaded report file if it was not added automatically.`);
-      } else {
-        setEmailSentStatus(`Email sent to ${recipientEmail} with the generated report attached.`);
-        notify.success('Email sent', `Report delivered to ${recipientEmail}.`);
-      }
+      setEmailSentStatus(`Email sent to ${recipientEmail} with the ${selectedMonth} report attached.`);
+      notify.success('Email sent', `Report for ${selectedMonth} delivered to ${recipientEmail}.`);
       storage.logAudit('EMAIL_SENT', 'Delivery', undefined, `Sent monthly report email to ${recipientEmail}`);
     } catch (err) {
-      setEmailSentStatus(err instanceof Error ? err.message : 'Could not send email.');
+      const message = err instanceof Error ? err.message : 'Could not send email.';
+      setEmailSentStatus(message);
+      notify.error('Email not sent', message);
     } finally {
       setIsSendingEmail(false);
     }

@@ -11,6 +11,7 @@ import {
 } from '@/lib/serverPassword';
 import { getSupabaseServerClient, isSupabaseServerConfigured } from '@/lib/supabase/server';
 import { userToRow } from '@/lib/supabase/rmsMap';
+import { sendAppEmail } from '@/lib/mailer';
 import type { User } from '@/types';
 
 export async function POST(request: Request) {
@@ -65,6 +66,15 @@ export async function POST(request: Request) {
   const { error } = await supabase.from('users').insert(userToRow(user));
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  }
+  try {
+    await sendAppEmail({
+      to: email,
+      subject: 'Your HESU ICT RMS account',
+      text: `Hello ${fullName},\n\nYour account was created.\nEmail: ${email}\nRecovery code: ${code}\n\nSave this recovery code. You need it if you forget your password.\n\nYou can sign in at the RMS login page.`
+    });
+  } catch {
+    // Account is created even if mail delivery fails.
   }
   return userSessionResponse(user, { recoveryCode: code });
 }

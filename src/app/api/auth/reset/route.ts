@@ -23,15 +23,26 @@ export async function POST(request: Request) {
   }
   const supabase = getSupabaseServerClient();
   const { data } = await supabase.from('users').select('*').eq('email', email).maybeSingle();
-  if (!data?.rsalt || !data?.rhash) {
+  if (!data) {
     return NextResponse.json(
-      { ok: false, error: 'Details did not match. Please verify your email and recovery code.' },
+      { ok: false, error: 'Details did not match. Please verify your email and code.' },
       { status: 401 }
     );
   }
-  const ok = await verifyPasswordServer(cleanCode, String(data.rsalt), String(data.rhash));
-  if (!ok) {
-    return NextResponse.json({ ok: false, error: 'Invalid recovery code.' }, { status: 401 });
+
+  let matched = false;
+  const emailed = await supabase.from('password_resets').select('*').eq('email', email).maybeSingle();
+  if (emailed.data?.hash && emailed.data?.salt && emailed.data?.expires_at) {
+    const stillValid = new Date(String(emailed.data.expires_at)).getTime() > Date.now();
+    if (stillValid) {
+      matched = await verifyPasswordServer(cleanCode, String(emailed.data.salt), String(emailed.data.hash));
+    }
+  }
+  if (!matched && data.rsalt && data.rhash) {
+    matched = await verifyPasswordServer(cleanCode, String(data.rsalt), String(data.rhash));
+  }
+  if (!matched) {
+    return NextResponse.json({ ok: false, error: 'Invalid or expired reset code.' }, { status: 401 });
   }
   const newCode = mkRecoveryCodeServer();
   const h = await hashPasswordServer(String(body.newPassword));
@@ -49,6 +60,7 @@ export async function POST(request: Request) {
   if (upd.error) {
     return NextResponse.json({ ok: false, error: upd.error.message }, { status: 500 });
   }
+  await supabase.from('password_resets').delete().eq('email', email);
   return NextResponse.json({
     ok: true,
     newRecoveryCode: newCode,

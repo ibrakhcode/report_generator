@@ -1,28 +1,42 @@
 'use client';
 
 import React, { useState } from 'react';
-import { BookOpen, Plus, Users, Star, Calendar, FileText, X } from 'lucide-react';
+import { BookOpen, Plus, Users, Star, Calendar, FileText, X, Eye, Edit2 } from 'lucide-react';
 import { TrainingRecord } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
+import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
 
 export const TrainingView: React.FC = () => {
   const [trainings, setTrainings] = useState<TrainingRecord[]>(() => storage.getTraining());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewingItem, setViewingItem] = useState<TrainingRecord | null>(null);
 
-  const [formData, setFormData] = useState<Partial<TrainingRecord>>({
+  const emptyTraining = (): Partial<TrainingRecord> => ({
     title: '',
     date: new Date().toISOString().split('T')[0],
     topic: '',
-    targetAudience: 'Warehouse & Logistics Staff',
+    targetAudience: '',
     participantCount: 15,
     learningObjectives: '',
     feedbackScore: 4.8,
     followUpActions: '',
     evidenceFiles: []
   });
+  const [formData, setFormData] = useState<Partial<TrainingRecord>>(emptyTraining);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setFormData(emptyTraining());
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (item: TrainingRecord) => {
+    setFormData(item);
+    setViewingItem(null);
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title) return;
 
@@ -30,7 +44,7 @@ export const TrainingView: React.FC = () => {
       id: formData.id || `TRN-2026-${String(trainings.length + 1).padStart(2, '0')}`,
       title: formData.title || '',
       date: formData.date || new Date().toISOString().split('T')[0],
-      topic: formData.topic || '',
+      topic: formData.topic || formData.title || '',
       targetAudience: formData.targetAudience || '',
       participantCount: Number(formData.participantCount) || 1,
       learningObjectives: formData.learningObjectives || '',
@@ -40,13 +54,21 @@ export const TrainingView: React.FC = () => {
       signedDocumentName: formData.signedDocumentName,
       signedDocumentDataUrl: formData.signedDocumentDataUrl,
       signedDocumentType: formData.signedDocumentType,
-      createdAt: new Date().toISOString()
+      createdAt: formData.createdAt || new Date().toISOString()
     };
 
     storage.saveTraining(toSave);
+    const saved = await storage.waitForLastPersist();
     setTrainings(storage.getTraining());
+    if (!saved) {
+      notify.error(
+        'Training is on this screen, but not in the database',
+        storage.getLastPersistError() || 'Check the server connection and try Save again.'
+      );
+      return;
+    }
     setIsModalOpen(false);
-    notify.success('Training saved', `${toSave.title} is in place.`);
+    notify.success('Training saved', `${toSave.title} is stored in the database.`);
   };
 
   return (
@@ -65,7 +87,7 @@ export const TrainingView: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenCreate}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-purple-600/20 flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" />
@@ -83,7 +105,7 @@ export const TrainingView: React.FC = () => {
             Record cybersecurity awareness seminars, phishing defense drills, system workshops, and attendance sheets.
           </p>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreate}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-lg shadow-purple-600/20"
           >
             <Plus className="w-4 h-4" />
@@ -102,9 +124,29 @@ export const TrainingView: React.FC = () => {
                   <span className="font-mono text-xs font-bold text-purple-400">{tr.id}</span>
                   <h3 className="text-sm font-bold text-white mt-1">{tr.title}</h3>
                 </div>
-                <div className="flex items-center gap-1 text-amber-400 text-xs font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  <span>{tr.feedbackScore} / 5.0</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setViewingItem(tr)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700"
+                    title="View training"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEdit(tr)}
+                    className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700"
+                    title="Edit training"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  {tr.feedbackScore ? (
+                    <div className="flex items-center gap-1 text-amber-400 text-xs font-bold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>{tr.feedbackScore} / 5.0</span>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -143,16 +185,19 @@ export const TrainingView: React.FC = () => {
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 text-slate-100 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-              <h3 className="text-sm font-bold text-white">Record Training Session</h3>
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden">
+          <div className="bg-slate-900 border border-slate-800 sm:rounded-2xl rounded-t-2xl max-w-lg w-full text-slate-100 shadow-2xl max-h-[100dvh] sm:max-h-[92dvh] flex flex-col">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-800 shrink-0">
+              <h3 className="text-sm font-bold text-white">
+                {formData.id ? `Edit Training: ${formData.id}` : 'Record Training Session'}
+              </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="space-y-3 text-xs">
+            <form onSubmit={handleSave} className="flex flex-col min-h-0 flex-1 text-xs">
+              <div className="space-y-3 overflow-y-auto px-4 sm:px-6 py-3 min-h-0 flex-1">
               <div>
                 <label className="block text-slate-400 font-semibold mb-1">Session Title</label>
                 <input
@@ -245,7 +290,8 @@ export const TrainingView: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              </div>
+              <div className="flex justify-end gap-2 px-4 sm:px-6 py-3 border-t border-slate-800 shrink-0 bg-slate-900 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -263,6 +309,21 @@ export const TrainingView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {viewingItem && (
+        <RecordDetailDialog
+          title={`Training ${viewingItem.id}`}
+          onClose={() => setViewingItem(null)}
+          onEdit={() => handleOpenEdit(viewingItem)}
+        >
+          <DetailRow label="Session title" value={viewingItem.title} />
+          <DetailRow label="Session date" value={viewingItem.date} />
+          <DetailRow label="Participants" value={String(viewingItem.participantCount)} />
+          <DetailRow label="Audience" value={viewingItem.targetAudience} />
+          <DetailRow label="Learning objectives" value={viewingItem.learningObjectives} />
+          <DetailRow label="Signed document" value={viewingItem.signedDocumentName} />
+        </RecordDetailDialog>
       )}
     </div>
   );

@@ -57,10 +57,18 @@ export const ProjectsView: React.FC = () => {
 
     const updatedProject = { ...project, milestones: updatedMilestones };
     storage.saveProject(updatedProject);
-    setProjects(storage.getProjects());
+    void storage.waitForLastPersist().then((saved) => {
+      setProjects(storage.getProjects());
+      if (!saved) {
+        notify.error(
+          'Milestone change was not stored',
+          storage.getLastPersistError() || 'Check the server connection and try again.'
+        );
+      }
+    });
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name) return;
 
@@ -88,9 +96,17 @@ export const ProjectsView: React.FC = () => {
     };
 
     storage.saveProject(toSave);
+    const saved = await storage.waitForLastPersist();
     setProjects(storage.getProjects());
+    if (!saved) {
+      notify.error(
+        'Project is on this screen, but not in the database',
+        storage.getLastPersistError() || 'Check the server connection and try Save again.'
+      );
+      return;
+    }
     setIsModalOpen(false);
-    notify.success('Project saved', `${toSave.name} is in place.`);
+    notify.success('Project saved', `${toSave.name} is stored in the database.`);
   };
 
   return (

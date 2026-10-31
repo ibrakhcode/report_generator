@@ -99,6 +99,26 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
     }
   };
 
+  const handleSendResetEmail = async () => {
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    if (!email.trim() || !email.includes('@')) {
+      setErrorMsg('Enter the account email so we can send a reset code.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await auth.requestPasswordResetEmail(email);
+      if (res.success) {
+        setSuccessMsg('If that account exists, a reset code was sent to the email.');
+      } else {
+        setErrorMsg(res.error || 'Could not send the reset email.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -378,7 +398,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
                 />
               </div>
               <div>
-                <label className={labelClass}>Recovery Code *</label>
+                <label className={labelClass}>Email or recovery code *</label>
                 <input
                   type="text"
                   required
@@ -388,6 +408,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
                   className={`${fieldClass} uppercase`}
                 />
               </div>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => void handleSendResetEmail()}
+                className="w-full h-11 rounded-lg border border-[#e2e8f0] bg-white text-[#0f172a] text-[13px] font-medium"
+              >
+                {loading ? 'Please wait...' : 'Send reset code to email'}
+              </button>
               <div>
                 <label className={labelClass}>New Password *</label>
                 <input
