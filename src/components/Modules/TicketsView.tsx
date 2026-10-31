@@ -11,6 +11,7 @@ import {
   User,
   X,
   Edit2,
+  Eye,
   Trash2,
   ExternalLink,
   Sparkles
@@ -23,6 +24,7 @@ import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { draftTicketWriteup } from '@/lib/writeAssist';
 import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 import { SuggestField } from '@/components/System/SuggestField';
+import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
 
 interface TicketsViewProps {
   selectedMonth: string;
@@ -35,6 +37,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<SupportTicket | null>(null);
+  const [viewingTicket, setViewingTicket] = useState<SupportTicket | null>(null);
   const autoSave = useAutoSaveEnabled();
   const departments = storage.getDepartmentNames();
   const devices = storage.getDeviceNames();
@@ -339,6 +342,13 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
                         <button
+                          onClick={() => setViewingTicket(tck)}
+                          className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          title="View ticket"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => handleOpenEdit(tck)}
                           className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
                           title="Edit Ticket"
@@ -508,6 +518,45 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {viewingTicket && (
+        <RecordDetailDialog
+          title={`Ticket ${viewingTicket.id}`}
+          onClose={() => setViewingTicket(null)}
+          onEdit={() => {
+            handleOpenEdit(viewingTicket);
+            setViewingTicket(null);
+          }}
+        >
+          <DetailRow label="Reported" value={new Date(viewingTicket.reportedAt).toLocaleString('en-GB')} />
+          <DetailRow label="Title" value={viewingTicket.title} />
+          <DetailRow label="Description" value={viewingTicket.description} />
+          <DetailRow label="Requester" value={viewingTicket.requesterName} />
+          <DetailRow label="Email" value={viewingTicket.requesterEmail} />
+          <DetailRow label="Departments" value={viewingTicket.department} />
+          <DetailRow label="Category" value={viewingTicket.category} />
+          <DetailRow label="Assets / systems" value={viewingTicket.applicationOrDevice} />
+          <DetailRow label="Priority" value={viewingTicket.priority} />
+          <DetailRow label="Status" value={viewingTicket.status} />
+          <DetailRow label="Technician" value={viewingTicket.assignedTechnician} />
+          <DetailRow label="Actions taken" value={viewingTicket.actionsTaken} />
+          <DetailRow label="Root cause" value={viewingTicket.rootCause} />
+          <DetailRow label="Resolution" value={viewingTicket.resolution} />
+          <DetailRow label="SLA target" value={`${viewingTicket.slaTargetHours}h`} />
+          <DetailRow
+            label="Resolution hours"
+            value={viewingTicket.resolutionHours !== undefined ? `${viewingTicket.resolutionHours}h` : ''}
+          />
+          <DetailRow label="SLA breached" value={viewingTicket.slaBreached ? 'Yes' : 'No'} />
+          <DetailRow label="Resolved at" value={viewingTicket.resolvedAt} />
+          <DetailRow label="Related activity" value={viewingTicket.relatedActivityId} />
+          <DetailRow label="Feedback" value={viewingTicket.userFeedback} />
+          <DetailRow label="Escalation notes" value={viewingTicket.escalationNotes} />
+          <DetailRow label="Evidence files" value={viewingTicket.evidenceFiles?.filter(Boolean).join(', ')} />
+          <DetailRow label="Created" value={viewingTicket.createdAt} />
+          <DetailRow label="Updated" value={viewingTicket.updatedAt} />
+        </RecordDetailDialog>
       )}
     </div>
   );

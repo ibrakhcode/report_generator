@@ -12,6 +12,7 @@ import {
   FileText,
   X,
   Edit2,
+  Eye,
   Trash2,
   Paperclip,
   Tag,
@@ -25,6 +26,7 @@ import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { draftDailyWork } from '@/lib/writeAssist';
 import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 import { SuggestField } from '@/components/System/SuggestField';
+import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
 
 interface ActivitiesViewProps {
   selectedMonth: string;
@@ -37,6 +39,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   const [statusFilter, setStatusFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DailyActivity | null>(null);
+  const [viewingItem, setViewingItem] = useState<DailyActivity | null>(null);
   const autoSave = useAutoSaveEnabled();
   const departments = storage.getDepartmentNames();
   const devices = storage.getDeviceNames();
@@ -344,6 +347,13 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
                         <button
+                          onClick={() => setViewingItem(act)}
+                          className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+                          title="View activity"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => handleOpenEdit(act)}
                           className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
                           title="Edit Activity"
@@ -522,6 +532,43 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
             </form>
           </div>
         </div>
+      )}
+
+      {viewingItem && (
+        <RecordDetailDialog
+          title={`Activity ${viewingItem.id}`}
+          onClose={() => setViewingItem(null)}
+          onEdit={() => {
+            handleOpenEdit(viewingItem);
+            setViewingItem(null);
+          }}
+        >
+          <DetailRow label="Date" value={viewingItem.date} />
+          <DetailRow label="Title" value={viewingItem.title} />
+          <DetailRow label="Description" value={viewingItem.description} />
+          <DetailRow label="Category" value={viewingItem.category} />
+          <DetailRow label="Departments" value={viewingItem.department} />
+          <DetailRow label="Assets / systems" value={viewingItem.systemOrDevice} />
+          <DetailRow label="Priority" value={viewingItem.priority} />
+          <DetailRow label="Status" value={viewingItem.status} />
+          <DetailRow label="Hours spent" value={`${viewingItem.hoursSpent}h`} />
+          <DetailRow label="Start time" value={viewingItem.startTime} />
+          <DetailRow label="End time" value={viewingItem.endTime} />
+          <DetailRow label="Action taken" value={viewingItem.actionTaken} />
+          <DetailRow label="Result / outcome" value={viewingItem.resultOutcome} />
+          <DetailRow label="Business impact" value={viewingItem.businessImpact} />
+          <DetailRow label="Related KPI" value={viewingItem.relatedKpiId} />
+          <DetailRow label="Related project" value={viewingItem.relatedProjectId} />
+          <DetailRow label="Related ticket" value={viewingItem.relatedTicketId} />
+          <DetailRow label="Next action" value={viewingItem.nextAction} />
+          <DetailRow label="Due date" value={viewingItem.dueDate} />
+          <DetailRow label="Lessons learned" value={viewingItem.lessonsLearned} />
+          <DetailRow label="Evidence links" value={viewingItem.evidenceLinks?.filter(Boolean).join(', ')} />
+          <DetailRow label="Evidence files" value={viewingItem.evidenceFiles?.filter(Boolean).join(', ')} />
+          <DetailRow label="Created by" value={viewingItem.createdBy} />
+          <DetailRow label="Created" value={viewingItem.createdAt} />
+          <DetailRow label="Updated" value={viewingItem.updatedAt} />
+        </RecordDetailDialog>
       )}
     </div>
   );

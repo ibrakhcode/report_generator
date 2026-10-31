@@ -1,18 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Layers, Plus, CheckSquare, Clock, Calendar, CheckCircle2, ChevronRight, X } from 'lucide-react';
+import { Layers, Plus, CheckSquare, Clock, Calendar, CheckCircle2, ChevronRight, X, Eye } from 'lucide-react';
 import { ProjectImprovement, ProjectMilestone } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
+import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
 
 export const ProjectsView: React.FC = () => {
   const [projects, setProjects] = useState<ProjectImprovement[]>(() => storage.getProjects());
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [viewingProject, setViewingProject] = useState<ProjectImprovement | null>(null);
 
   const users = storage.getCompanyUsers().filter((user) => user.active !== false);
-  const [formData, setFormData] = useState<Partial<ProjectImprovement>>({
+  const emptyProject = (): Partial<ProjectImprovement> => ({
     name: '',
     objective: '',
     businessJustification: '',
@@ -33,6 +35,12 @@ export const ProjectsView: React.FC = () => {
     approvalStatus: 'Approved',
     evidenceFiles: []
   });
+  const [formData, setFormData] = useState<Partial<ProjectImprovement>>(emptyProject);
+
+  const handleOpenCreate = () => {
+    setFormData(emptyProject());
+    setIsModalOpen(true);
+  };
 
   const handleToggleMilestone = (project: ProjectImprovement, milestoneId: string) => {
     const updatedMilestones = project.milestones.map((m) => {
@@ -69,12 +77,13 @@ export const ProjectsView: React.FC = () => {
       myResponsibilities: formData.myResponsibilities || '',
       status: formData.status || 'Active',
       milestones: formData.milestones || [],
-      progressPercent: 0,
+      progressPercent: formData.progressPercent || 0,
       risksAndDependencies: formData.risksAndDependencies || '',
       benefitsAndOutcomes: formData.benefitsAndOutcomes || '',
       approvalStatus: formData.approvalStatus || 'Approved',
       evidenceFiles: formData.evidenceFiles || [],
-      createdAt: new Date().toISOString(),
+      lessonsLearned: formData.lessonsLearned,
+      createdAt: formData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
@@ -100,7 +109,7 @@ export const ProjectsView: React.FC = () => {
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenCreate}
           className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-teal-600/20 flex items-center gap-1.5"
         >
           <Plus className="w-4 h-4" />
@@ -118,7 +127,7 @@ export const ProjectsView: React.FC = () => {
             Record continuous improvements, IT infrastructure upgrades, disaster recovery tests, or ERP enhancements with weighted milestone tracking.
           </p>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreate}
             className="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 shadow-lg shadow-teal-600/20"
           >
             <Plus className="w-4 h-4" />
@@ -147,11 +156,19 @@ export const ProjectsView: React.FC = () => {
                 <p className="text-xs text-slate-300 mt-1">{proj.objective}</p>
               </div>
 
-              <div className="text-right sm:shrink-0">
+              <div className="text-right sm:shrink-0 space-y-2">
                 <div className="text-2xl font-black text-teal-400 font-mono">
                   {proj.progressPercent}%
                 </div>
                 <div className="text-[11px] text-slate-400">Milestone Progress</div>
+                <button
+                  type="button"
+                  onClick={() => setViewingProject(proj)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  View
+                </button>
               </div>
             </div>
 
@@ -211,7 +228,9 @@ export const ProjectsView: React.FC = () => {
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 text-slate-100 shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-              <h3 className="text-sm font-bold text-white">Create Project Initiative</h3>
+              <h3 className="text-sm font-bold text-white">
+                {formData.id ? `Edit Project: ${formData.id}` : 'Create Project Initiative'}
+              </h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white">
                 <X className="w-5 h-5" />
               </button>
@@ -307,6 +326,47 @@ export const ProjectsView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+
+      {viewingProject && (
+        <RecordDetailDialog
+          title={`Project ${viewingProject.id}`}
+          onClose={() => setViewingProject(null)}
+          onEdit={() => {
+            setFormData(viewingProject);
+            setViewingProject(null);
+            setIsModalOpen(true);
+          }}
+        >
+          <DetailRow label="Name" value={viewingProject.name} />
+          <DetailRow label="Objective" value={viewingProject.objective} />
+          <DetailRow label="Business justification" value={viewingProject.businessJustification} />
+          <DetailRow label="Owner" value={viewingProject.owner} />
+          <DetailRow label="Assigned to" value={viewingProject.assignedUserName} />
+          <DetailRow label="My responsibilities" value={viewingProject.myResponsibilities} />
+          <DetailRow label="Start date" value={viewingProject.startDate} />
+          <DetailRow label="Target completion" value={viewingProject.targetCompletionDate} />
+          <DetailRow label="Status" value={viewingProject.status} />
+          <DetailRow label="Approval" value={viewingProject.approvalStatus} />
+          <DetailRow label="Progress" value={`${viewingProject.progressPercent}%`} />
+          <DetailRow label="Risks and dependencies" value={viewingProject.risksAndDependencies} />
+          <DetailRow label="Benefits and outcomes" value={viewingProject.benefitsAndOutcomes} />
+          <DetailRow label="Estimated cost" value={viewingProject.estimatedCost} />
+          <DetailRow label="Lessons learned" value={viewingProject.lessonsLearned} />
+          <DetailRow
+            label="Milestones"
+            value={
+              viewingProject.milestones?.length
+                ? viewingProject.milestones
+                    .map((item) => `${item.title} (${item.status}, ${item.weightPercent}%)`)
+                    .join('\n')
+                : ''
+            }
+          />
+          <DetailRow label="Evidence files" value={viewingProject.evidenceFiles?.filter(Boolean).join(', ')} />
+          <DetailRow label="Created" value={viewingProject.createdAt} />
+          <DetailRow label="Updated" value={viewingProject.updatedAt} />
+        </RecordDetailDialog>
       )}
     </div>
   );
