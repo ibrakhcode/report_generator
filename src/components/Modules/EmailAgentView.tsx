@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { Inbox, Save, CheckCircle2, AlertCircle } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { auth } from '@/services/auth';
+import { useAppSession } from '@/context/AppSessionContext';
+import { notify } from '@/lib/systemNotify';
 
 function parseField(raw: string, label: string): string {
   const match = raw.match(new RegExp(`^${label}:\\s*(.+)$`, 'im'));
@@ -15,8 +17,9 @@ export function EmailAgentView() {
   const [recordType, setRecordType] = useState<'ticket' | 'activity'>('ticket');
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { selectedMonth } = useAppSession();
 
-  const handleRecord = (e: React.FormEvent) => {
+  const handleRecord = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setStatus(null);
@@ -32,17 +35,20 @@ export function EmailAgentView() {
     const body = text.split(/\n\s*\n/).slice(1).join('\n').trim() || text;
     const user = auth.getCurrentUser();
     const now = new Date();
-    const date = now.toISOString().slice(0, 10);
+    const today = now.toISOString().slice(0, 10);
+    const date = today.startsWith(selectedMonth) ? today : `${selectedMonth}-01`;
     const stamp = now.toISOString();
+    const department = storage.getDepartmentNames()[0] || 'Information Technology';
+    let ticketId = '';
 
     if (recordType === 'ticket') {
-      const id = `TCK-MAIL-${Date.now()}`;
+      ticketId = `TCK-MAIL-${Date.now()}`;
       storage.saveTicket({
-        id,
+        id: ticketId,
         reportedAt: stamp,
         requesterName: from.replace(/<.+>/, '').trim() || user?.fullName || 'Email sender',
         requesterEmail: emailMatch?.[0] || user?.email || '',
-        department: storage.getDepartmentNames()[0] || 'Information Technology',
+        department,
         title: subject,
         description: body,
         category: 'Email',
@@ -59,37 +65,58 @@ export function EmailAgentView() {
         createdAt: stamp,
         updatedAt: stamp
       });
-      storage.logAudit('CREATE', 'Email Agent', id, `Recorded support ticket from email: ${subject}`);
-      setStatus(`Ticket ${id} created from this email.`);
-    } else {
-      const id = `ACT-MAIL-${Date.now()}`;
-      storage.saveActivity({
-        id,
-        date,
-        title: subject,
-        description: body,
-        category: 'User Support',
-        department: storage.getDepartmentNames()[0] || 'Information Technology',
-        systemOrDevice: storage.getDeviceNames()[0] || 'Email intake',
-        priority: 'Medium',
-        startTime: '08:30',
-        endTime: '09:00',
-        hoursSpent: 0.5,
-        status: 'Completed',
-        actionTaken: 'Logged from incoming email by Email Agent.',
-        resultOutcome: 'Record captured in Daily Activity Register.',
-        businessImpact: 'Email request is now tracked in the ICT workspace.',
-        relatedKpiId: '',
-        evidenceLinks: [],
-        evidenceFiles: [],
-        lessonsLearned: '',
-        createdBy: user?.fullName || user?.email || 'Email Agent',
-        createdAt: stamp,
-        updatedAt: stamp
-      });
-      storage.logAudit('CREATE', 'Email Agent', id, `Recorded daily activity from email: ${subject}`);
-      setStatus(`Activity ${id} created from this email.`);
+      storage.logAudit('CREATE', 'Email Agent', ticketId, `Recorded support ticket from email: ${subject}`);
+      const ticketSaved = await storage.waitForLastPersist();
+      if (!ticketSaved) {
+        const message = storage.getLastPersistError() || 'Ticket was not stored.';
+        setError(message);
+        notify.error('Email ticket not stored', message);
+        return;
+      }
     }
+
+    const activityId = `ACT-MAIL-${Date.now()}`;
+    storage.saveActivity({
+      id: activityId,
+      date,
+      title: subject,
+      description: body,
+      category: 'User Support',
+      department,
+      systemOrDevice: storage.getDeviceNames()[0] || 'Email intake',
+      priority: 'Medium',
+      startTime: '08:30',
+      endTime: '09:00',
+      hoursSpent: 0.5,
+      status: 'Completed',
+      actionTaken: ticketId
+        ? `Logged from incoming email. Linked ticket ${ticketId}.`
+        : 'Logged from incoming email by Email Agent.',
+      resultOutcome: 'Record captured in Daily Activity Register.',
+      businessImpact: 'Email request is now tracked in the ICT workspace.',
+      relatedKpiId: '',
+      relatedTicketId: ticketId || undefined,
+      evidenceLinks: [],
+      evidenceFiles: [],
+      lessonsLearned: '',
+      createdBy: user?.fullName || user?.email || 'Email Agent',
+      createdAt: stamp,
+      updatedAt: stamp
+    });
+    storage.logAudit('CREATE', 'Email Agent', activityId, `Recorded daily activity from email: ${subject}`);
+    const activitySaved = await storage.waitForLastPersist();
+    if (!activitySaved) {
+      const message = storage.getLastPersistError() || 'Activity was not stored.';
+      setError(message);
+      notify.error('Email activity not stored', message);
+      return;
+    }
+
+    const summary = ticketId
+      ? `Ticket ${ticketId} and activity ${activityId} created from this email.`
+      : `Activity ${activityId} created from this email.`;
+    setStatus(summary);
+    notify.success('Email recorded', summary);
     setRawEmail('');
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Plus,
   Search,
@@ -27,6 +27,7 @@ import { draftDailyWork } from '@/lib/writeAssist';
 import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 import { SuggestField } from '@/components/System/SuggestField';
 import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
+import { useAppSession } from '@/context/AppSessionContext';
 
 interface ActivitiesViewProps {
   selectedMonth: string;
@@ -41,9 +42,14 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   const [editingItem, setEditingItem] = useState<DailyActivity | null>(null);
   const [viewingItem, setViewingItem] = useState<DailyActivity | null>(null);
   const autoSave = useAutoSaveEnabled();
+  const { workspaceRevision } = useAppSession();
   const departments = storage.getDepartmentNames();
   const devices = storage.getDeviceNames();
   const defaultDepartment = departments[0] || '';
+
+  useEffect(() => {
+    setActivities(storage.getActivities());
+  }, [workspaceRevision, selectedMonth]);
 
   const dateInSelectedMonth = () => {
     const today = new Date().toISOString().split('T')[0];

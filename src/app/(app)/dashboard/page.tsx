@@ -10,6 +10,12 @@ const DashboardView = dynamic(
 );
 
 export default function DashboardPage() {
-  const { selectedMonth, selectModule } = useAppSession();
-  return <DashboardView selectedMonth={selectedMonth} onNavigate={selectModule} />;
+  const { selectedMonth, selectModule, workspaceRevision } = useAppSession();
+  return (
+    <DashboardView
+      key={workspaceRevision}
+      selectedMonth={selectedMonth}
+      onNavigate={selectModule}
+    />
+  );
 }
