@@ -21,7 +21,7 @@ export async function loadBundledDefaultPptx(): Promise<string | undefined> {
     if (!res.ok) return undefined;
     const blob = await res.blob();
     const dataUrl = await blobToDataUrl(blob);
-    await saveTemplateFile(BUNDLED_DEFAULT_TEMPLATE_ID, dataUrl);
+    await saveTemplateFileLocal(BUNDLED_DEFAULT_TEMPLATE_ID, dataUrl);
     return dataUrl;
   } catch {
     return undefined;
@@ -44,7 +44,7 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function saveTemplateFile(templateId: string, dataUrl: string): Promise<void> {
+async function saveTemplateFileLocal(templateId: string, dataUrl: string): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readwrite');
@@ -55,7 +55,7 @@ export async function saveTemplateFile(templateId: string, dataUrl: string): Pro
   db.close();
 }
 
-export async function loadTemplateFile(templateId: string): Promise<string | undefined> {
+async function loadTemplateFileLocal(templateId: string): Promise<string | undefined> {
   const db = await openDb();
   const value = await new Promise<string | undefined>((resolve, reject) => {
     const tx = db.transaction(STORE, 'readonly');
@@ -64,7 +64,51 @@ export async function loadTemplateFile(templateId: string): Promise<string | und
     req.onerror = () => reject(req.error);
   });
   db.close();
-  if (value) return value;
+  return value;
+}
+
+async function loadTemplateFileRemote(templateId: string): Promise<string | undefined> {
+  if (typeof fetch === 'undefined') return undefined;
+  try {
+    const res = await fetch(`/api/rms/templates/file?id=${encodeURIComponent(templateId)}`);
+    if (!res.ok) return undefined;
+    const type = res.headers.get('content-type') || '';
+    if (type.includes('application/json')) return undefined;
+    const blob = await res.blob();
+    if (!blob.size) return undefined;
+    return blobToDataUrl(blob);
+  } catch {
+    return undefined;
+  }
+}
+
+export async function saveTemplateFile(
+  templateId: string,
+  dataUrl: string,
+  options?: { persistRemote?: boolean }
+): Promise<string | undefined> {
+  await saveTemplateFileLocal(templateId, dataUrl);
+  if (options?.persistRemote === false) return undefined;
+  const blob = await (await fetch(dataUrl)).blob();
+  const form = new FormData();
+  form.append('templateId', templateId);
+  form.append('file', new File([blob], `${templateId}.pptx`, { type: blob.type }));
+  const res = await fetch('/api/rms/templates/file', { method: 'POST', body: form });
+  const data = (await res.json()) as { ok?: boolean; storagePath?: string; error?: string };
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || 'Could not store the template file on the server.');
+  }
+  return data.storagePath;
+}
+
+export async function loadTemplateFile(templateId: string): Promise<string | undefined> {
+  const local = await loadTemplateFileLocal(templateId).catch(() => undefined);
+  if (local) return local;
+  const remote = await loadTemplateFileRemote(templateId);
+  if (remote) {
+    await saveTemplateFileLocal(templateId, remote).catch(() => undefined);
+    return remote;
+  }
   if (templateId === BUNDLED_DEFAULT_TEMPLATE_ID) {
     return loadBundledDefaultPptx();
   }
@@ -72,12 +116,21 @@ export async function loadTemplateFile(templateId: string): Promise<string | und
 }
 
 export async function deleteTemplateFile(templateId: string): Promise<void> {
-  const db = await openDb();
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE, 'readwrite');
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.objectStore(STORE).delete(templateId);
-  });
-  db.close();
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readwrite');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.objectStore(STORE).delete(templateId);
+    });
+    db.close();
+  } catch {
+    // Local cache may already be empty.
+  }
+  if (typeof fetch !== 'undefined') {
+    await fetch(`/api/rms/templates/file?id=${encodeURIComponent(templateId)}`, { method: 'DELETE' }).catch(
+      () => undefined
+    );
+  }
 }

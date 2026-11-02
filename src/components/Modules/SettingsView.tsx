@@ -5,7 +5,6 @@ import { Sliders, Save, CheckCircle2, Shield, Globe, Mail, Palette, Type } from 
 import { AppSettings, UiFont, UiTheme } from '../../types';
 import { storage } from '../../services/storage';
 import { UI_FONTS, UI_THEMES, applyAppearance } from '../../lib/appearance';
-import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
 import { auth } from '@/services/auth';
@@ -13,7 +12,6 @@ import { auth } from '@/services/auth';
 export const SettingsView: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(() => storage.getSettings());
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const autoSave = useAutoSaveEnabled();
   const [currentPassword, setCurrentPassword] = useState('');
   const [nextPassword, setNextPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -21,22 +19,26 @@ export const SettingsView: React.FC = () => {
   const applyLiveAppearance = (next: AppSettings) => {
     setSettings(next);
     applyAppearance(next.uiTheme, next.uiFont);
-    storage.saveSettings(next);
   };
 
-  const persistSettings = useCallback(() => {
+  const persistSettings = useCallback(async () => {
     storage.saveSettings(settings, { silent: true });
     applyAppearance(settings.uiTheme, settings.uiFont);
+    const saved = await storage.waitForLastPersist();
+    if (!saved) {
+      notify.error('Settings not saved', storage.getLastPersistError() || 'Could not store settings.');
+      return false;
+    }
+    return true;
   }, [settings]);
 
-  useAutoSave(autoSave, settings, persistSettings);
-
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    persistSettings();
+    const saved = await persistSettings();
+    if (!saved) return;
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
-    notify.success('Settings saved', 'Application configuration is in place.');
+    notify.success('Settings saved', 'These settings stay after refresh until you save again.');
   };
 
   const handleChangePassword = async () => {
@@ -75,7 +77,7 @@ export const SettingsView: React.FC = () => {
           className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
         >
           <Save className="w-4 h-4" />
-          <span>Save Changes</span>
+          <span>Save settings</span>
         </button>
       </div>
 
@@ -320,6 +322,15 @@ export const SettingsView: React.FC = () => {
           </div>
         </div>
 
+        <div className="md:col-span-2 flex justify-end">
+          <button
+            type="submit"
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5"
+          >
+            <Save className="w-4 h-4" />
+            Save settings
+          </button>
+        </div>
       </form>
     </div>
   );

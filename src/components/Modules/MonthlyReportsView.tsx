@@ -14,8 +14,6 @@ import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { useAppSession } from '@/context/AppSessionContext';
 import { resolveTemplate } from '@/lib/reportTheme';
 import { ReportDocumentPreview } from '@/components/Reports/ReportDocumentPreview';
-import { ReportPdfPreview } from '@/components/Reports/ReportPdfPreview';
-import { BUNDLED_DEFAULT_PPTX_NAME, BUNDLED_DEFAULT_TEMPLATE_ID } from '@/lib/templateFileStore';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
 
@@ -98,7 +96,7 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
           </p>
           <div className="pt-2">
             <SuggestField
-              label="Look / design template"
+              label="Template"
               className="max-w-md"
               value={selectedTemplateId}
               onChange={(next) => {
@@ -106,10 +104,12 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
                 sessionStorage.setItem('hesu_selected_template_id', next);
                 storage.saveReport({ ...report, selectedTemplateId: next });
               }}
-              placeholder="Type a template name"
+              placeholder="Select a template"
               options={templates.map((tmpl) => ({
                 value: tmpl.id,
-                label: `${tmpl.name}${tmpl.isDefault ? ' (default)' : ''}`
+                label: `${tmpl.name}${tmpl.isDefault ? ' (default)' : ''}${
+                  tmpl.uploadedTemplateName ? ' · uploaded' : ''
+                }`
               }))}
             />
           </div>
@@ -168,10 +168,6 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
 
       {activeTab === 'preview' && (
         <div className="space-y-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 sm:p-6">
-          {selectedTemplateId !== BUNDLED_DEFAULT_TEMPLATE_ID &&
-          resolveTemplate(selectedTemplateId).uploadedTemplateName !== BUNDLED_DEFAULT_PPTX_NAME ? (
-            <ReportPdfPreview report={report} templateId={selectedTemplateId} />
-          ) : null}
           <ReportDocumentPreview report={report} template={resolveTemplate(selectedTemplateId)} />
         </div>
       )}

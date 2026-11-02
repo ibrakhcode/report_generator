@@ -1,49 +1,248 @@
 'use client';
 
 import React from 'react';
+import {
+  Activity,
+  Award,
+  FolderKanban,
+  Gauge,
+  GraduationCap,
+  LayoutGrid,
+  Shield,
+  Ticket
+} from 'lucide-react';
 import { MonthlyReportData, ReportTemplate } from '../../types';
 import { BUNDLED_DEFAULT_PPTX_NAME, BUNDLED_DEFAULT_TEMPLATE_ID } from '@/lib/templateFileStore';
 import { IctMonthlyPptxPreview } from './IctMonthlyPptxPreview';
+import { isGeneratedStyleTemplate, presetById, styleIdFromTemplate } from '@/lib/templateStyles';
 
 interface ReportDocumentPreviewProps {
   report: MonthlyReportData;
   template: ReportTemplate;
 }
 
+const PAGE_ICONS = {
+  'Executive Summary': Shield,
+  'Daily Work': Activity,
+  'Helpdesk Tickets': Ticket,
+  Projects: FolderKanban,
+  'KPI Matrix': Gauge,
+  Training: GraduationCap,
+  'Narrative & Sign-off': Award
+} as const;
+
+function CoverPage({
+  template,
+  report,
+  layout
+}: {
+  template: ReportTemplate;
+  report: MonthlyReportData;
+  layout: ReturnType<typeof presetById>['layout'];
+}) {
+  const primary = template.primaryColor || '#0F2D59';
+  const accent = template.accentColor || '#1E6091';
+  const font = template.fontFamily || 'Arial, sans-serif';
+  if (layout === 'split') {
+    return (
+      <article className="min-h-[920px] grid grid-cols-5 shadow-xl overflow-hidden" style={{ fontFamily: font }}>
+        <div className="col-span-2 p-10 flex flex-col justify-between text-white" style={{ backgroundColor: primary }}>
+          <LayoutGrid className="w-10 h-10" style={{ color: accent }} />
+          <div>
+            <p className="text-xs tracking-[0.25em] uppercase" style={{ color: accent }}>
+              {report.companyName}
+            </p>
+            <h2 className="text-3xl font-black mt-4 leading-tight">{template.headerText}</h2>
+          </div>
+          <p className="text-[11px] opacity-70">{template.footerText}</p>
+        </div>
+        <div className="col-span-3 p-12 bg-slate-950 text-slate-100 flex flex-col justify-center gap-4">
+          <p className="text-lg">ICT monthly performance pack</p>
+          <p>Period: {report.reportingPeriod || report.month}</p>
+          <p>
+            Prepared by {report.employeeName} ({report.employeeTitle})
+          </p>
+          <p>Department: {report.department}</p>
+        </div>
+      </article>
+    );
+  }
+  if (layout === 'paper') {
+    return (
+      <article className="min-h-[920px] bg-[#F7F1E1] shadow-xl p-12 flex flex-col justify-between" style={{ fontFamily: font, color: template.textColor }}>
+        <div className="h-2 w-full" style={{ backgroundColor: accent }} />
+        <div>
+          <Award className="w-10 h-10 mb-6" style={{ color: primary }} />
+          <p className="text-xs tracking-[0.3em] uppercase" style={{ color: primary }}>
+            {report.companyName}
+          </p>
+          <h2 className="text-4xl font-black mt-4 leading-tight">{template.headerText}</h2>
+          <p className="mt-4 text-lg">{report.reportingPeriod || report.month}</p>
+        </div>
+        <p className="text-sm">
+          {report.employeeName} · {report.employeeTitle} · {report.department}
+        </p>
+      </article>
+    );
+  }
+  if (layout === 'sidebar') {
+    return (
+      <article className="min-h-[920px] grid grid-cols-3 shadow-xl overflow-hidden" style={{ fontFamily: font }}>
+        <div className="p-8 text-white flex flex-col justify-between" style={{ backgroundColor: primary }}>
+          <Shield className="w-8 h-8" style={{ color: accent }} />
+          <p className="text-xs tracking-widest uppercase">{report.companyName}</p>
+        </div>
+        <div className="col-span-2 bg-white p-12 flex flex-col justify-center" style={{ color: template.textColor }}>
+          <h2 className="text-4xl font-black leading-tight">{template.headerText}</h2>
+          <p className="mt-6">{report.reportingPeriod || report.month}</p>
+          <p className="mt-2">
+            {report.employeeName} ({report.employeeTitle})
+          </p>
+        </div>
+      </article>
+    );
+  }
+  if (layout === 'band') {
+    return (
+      <article className="min-h-[920px] bg-slate-50 shadow-xl flex flex-col" style={{ fontFamily: font }}>
+        <div className="px-12 py-8 text-white" style={{ backgroundColor: primary }}>
+          <LayoutGrid className="w-8 h-8 mb-4" style={{ color: accent }} />
+          <p className="text-xs tracking-[0.25em] uppercase">{report.companyName}</p>
+          <h2 className="text-3xl font-black mt-3">{template.headerText}</h2>
+        </div>
+        <div className="flex-1 px-12 py-10 grid grid-cols-2 gap-6" style={{ color: template.textColor }}>
+          <p>Period: {report.reportingPeriod || report.month}</p>
+          <p>Prepared by: {report.employeeName}</p>
+          <p>Department: {report.department}</p>
+          <p>Status: {report.status}</p>
+        </div>
+      </article>
+    );
+  }
+  if (layout === 'cards') {
+    return (
+      <article className="min-h-[920px] text-white shadow-xl p-12 flex flex-col justify-between" style={{ backgroundColor: primary, fontFamily: font }}>
+        <Activity className="w-10 h-10" style={{ color: accent }} />
+        <div>
+          <p className="text-sm tracking-[0.2em] uppercase" style={{ color: accent }}>
+            {report.companyName}
+          </p>
+          <h2 className="text-4xl font-black mt-4 leading-tight">{template.headerText}</h2>
+          <div className="grid grid-cols-2 gap-3 mt-10">
+            <div className="rounded-2xl p-4 bg-white/10">Period {report.reportingPeriod || report.month}</div>
+            <div className="rounded-2xl p-4 bg-white/10">{report.department}</div>
+          </div>
+        </div>
+        <p className="text-sm">
+          {report.employeeName} · {report.employeeTitle}
+        </p>
+      </article>
+    );
+  }
+  return (
+    <article className="min-h-[920px] flex flex-col justify-between p-12 shadow-xl text-white" style={{ backgroundColor: primary, fontFamily: font }}>
+      <div>
+        <p className="text-sm font-bold tracking-[0.2em]" style={{ color: accent }}>
+          {report.companyName.toUpperCase()}
+        </p>
+        <h2 className="text-3xl font-black mt-8 leading-tight">{template.headerText}</h2>
+        <p className="text-lg mt-4 text-white/85">INFORMATION &amp; COMMUNICATIONS TECHNOLOGY (ICT) MONTHLY PERFORMANCE REPORT</p>
+      </div>
+      <div className="space-y-2 text-sm">
+        <p>Reporting Period: {report.reportingPeriod || report.month}</p>
+        <p>
+          Prepared By: {report.employeeName} ({report.employeeTitle})
+        </p>
+        <p>Department: {report.department}</p>
+        <p>
+          Status: {report.status} (v{report.version})
+        </p>
+      </div>
+      <p className="text-[11px] border-t border-white/20 pt-4">{template.footerText}</p>
+    </article>
+  );
+}
+
 function PageShell({
   children,
   template,
   report,
-  pageLabel
+  pageLabel,
+  dark,
+  showIcon
 }: {
   children: React.ReactNode;
   template: ReportTemplate;
   report: MonthlyReportData;
   pageLabel: string;
+  dark?: boolean;
+  showIcon?: boolean;
 }) {
+  const Icon = PAGE_ICONS[pageLabel as keyof typeof PAGE_ICONS] || Shield;
   return (
     <article
-      className="bg-white shadow-xl overflow-hidden min-h-[920px] flex flex-col"
+      className="shadow-xl overflow-hidden min-h-[920px] flex flex-col"
       style={{
-        color: template.textColor || '#1E293B',
+        backgroundColor: dark ? '#0B1220' : '#ffffff',
+        color: dark ? '#E2E8F0' : template.textColor || '#1E293B',
         fontFamily: template.fontFamily || 'Arial, sans-serif'
       }}
     >
-      <header className="px-10 py-4 text-white" style={{ backgroundColor: template.primaryColor || '#0F2D59' }}>
-        <p className="text-[11px] font-bold tracking-wide" style={{ color: template.accentColor || '#93C5FD' }}>
-          {report.companyName}
-        </p>
-        <p className="text-sm font-bold mt-1">{template.headerText || 'ICT PERFORMANCE & OPERATIONAL REPORT'}</p>
-        <p className="text-[11px] mt-1 opacity-80">{pageLabel}</p>
+      <header className="px-10 py-4 text-white flex items-start gap-3" style={{ backgroundColor: template.primaryColor || '#0F2D59' }}>
+        {showIcon ? <Icon className="w-5 h-5 mt-1 shrink-0" style={{ color: template.accentColor || '#93C5FD' }} /> : null}
+        <div>
+          <p className="text-[11px] font-bold tracking-wide" style={{ color: template.accentColor || '#93C5FD' }}>
+            {report.companyName}
+          </p>
+          <p className="text-sm font-bold mt-1">{template.headerText || 'ICT PERFORMANCE & OPERATIONAL REPORT'}</p>
+          <p className="text-[11px] mt-1 opacity-80">{pageLabel}</p>
+        </div>
       </header>
       <div className="flex-1 px-10 py-6">{children}</div>
       <footer
         className="px-10 py-3 text-[10px] border-t"
-        style={{ borderColor: `${template.accentColor || '#1E6091'}55`, color: template.textColor || '#475569' }}
+        style={{ borderColor: `${template.accentColor || '#1E6091'}55`, color: dark ? '#94A3B8' : template.textColor || '#475569' }}
       >
         {template.footerText || 'Confidential'} — {report.companyName} | {report.reportingPeriod || report.month} | {pageLabel}
       </footer>
     </article>
+  );
+}
+
+function SectionHeading({
+  n,
+  title,
+  primary,
+  accent,
+  icon: Icon
+}: {
+  n: string;
+  title: string;
+  primary: string;
+  accent: string;
+  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
+}) {
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <span
+        className="w-10 h-10 rounded-2xl text-white text-sm font-black flex items-center justify-center shadow-sm"
+        style={{ backgroundColor: primary }}
+      >
+        {n}
+      </span>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4" style={{ color: accent }} />
+          <p className="text-[10px] uppercase tracking-[0.22em] font-bold" style={{ color: accent }}>
+            Section {n}
+          </p>
+        </div>
+        <h3 className="text-xl font-black leading-tight" style={{ color: primary }}>
+          {title}
+        </h3>
+        <div className="h-1 w-20 mt-1.5 rounded-full" style={{ backgroundColor: accent }} />
+      </div>
+    </div>
   );
 }
 
@@ -61,6 +260,10 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
   const training = report.trainingSummary.sessions || [];
   const accent = template.accentColor || '#1E6091';
   const primary = template.primaryColor || '#0F2D59';
+  const generated = isGeneratedStyleTemplate(template);
+  const styleId = styleIdFromTemplate(template);
+  const preset = styleId ? presetById(styleId) : null;
+  const dark = generated && preset?.layout === 'split';
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-10">
@@ -70,34 +273,42 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         </p>
       ) : null}
 
-      <article
-        className="min-h-[920px] flex flex-col justify-between p-12 shadow-xl text-white"
-        style={{ backgroundColor: primary, fontFamily: template.fontFamily || 'Arial, sans-serif' }}
-      >
-        <div>
-          <p className="text-sm font-bold tracking-[0.2em]" style={{ color: accent }}>
-            {report.companyName.toUpperCase()}
-          </p>
-          <h2 className="text-3xl font-black mt-8 leading-tight">{template.headerText}</h2>
-          <p className="text-lg mt-4 text-white/85">INFORMATION &amp; COMMUNICATIONS TECHNOLOGY (ICT) MONTHLY PERFORMANCE REPORT</p>
-        </div>
-        <div className="space-y-2 text-sm">
-          <p>Reporting Period: {report.reportingPeriod || report.month}</p>
-          <p>
-            Prepared By: {report.employeeName} ({report.employeeTitle})
-          </p>
-          <p>Department: {report.department}</p>
-          <p>
-            Status: {report.status} (v{report.version})
-          </p>
-        </div>
-        <p className="text-[11px] border-t border-white/20 pt-4">{template.footerText}</p>
-      </article>
+      {generated && preset ? (
+        <CoverPage template={template} report={report} layout={preset.layout} />
+      ) : (
+        <article
+          className="min-h-[920px] flex flex-col justify-between p-12 shadow-xl text-white"
+          style={{ backgroundColor: primary, fontFamily: template.fontFamily || 'Arial, sans-serif' }}
+        >
+          <div>
+            <p className="text-sm font-bold tracking-[0.2em]" style={{ color: accent }}>
+              {report.companyName.toUpperCase()}
+            </p>
+            <h2 className="text-3xl font-black mt-8 leading-tight">{template.headerText}</h2>
+            <p className="text-lg mt-4 text-white/85">INFORMATION &amp; COMMUNICATIONS TECHNOLOGY (ICT) MONTHLY PERFORMANCE REPORT</p>
+          </div>
+          <div className="space-y-2 text-sm">
+            <p>Reporting Period: {report.reportingPeriod || report.month}</p>
+            <p>
+              Prepared By: {report.employeeName} ({report.employeeTitle})
+            </p>
+            <p>Department: {report.department}</p>
+            <p>
+              Status: {report.status} (v{report.version})
+            </p>
+          </div>
+          <p className="text-[11px] border-t border-white/20 pt-4">{template.footerText}</p>
+        </article>
+      )}
 
-      <PageShell template={template} report={report} pageLabel="Executive Summary">
-        <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
-          1. Executive Summary
-        </h3>
+      <PageShell template={template} report={report} pageLabel="Executive Summary" dark={dark} showIcon={generated}>
+        {generated ? (
+          <SectionHeading n="01" title="Executive Summary" primary={primary} accent={accent} icon={Shield} />
+        ) : (
+          <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
+            1. Executive Summary
+          </h3>
+        )}
         <p className="text-sm leading-relaxed whitespace-pre-line">{report.executiveSummary}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
           {[
@@ -106,7 +317,15 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
             { label: 'SLA compliance', value: `${report.ticketsSummary.slaCompliancePercent}%` },
             { label: 'Projects', value: String(projects.length) }
           ].map((card) => (
-            <div key={card.label} className="rounded-xl p-3 border" style={{ borderColor: accent }}>
+            <div
+              key={card.label}
+              className={generated ? 'rounded-2xl p-4 shadow-sm' : 'rounded-xl p-3 border'}
+              style={
+                generated
+                  ? { backgroundColor: `${accent}22`, borderLeft: `4px solid ${accent}` }
+                  : { borderColor: accent }
+              }
+            >
               <p className="text-[10px] uppercase tracking-wide" style={{ color: accent }}>
                 {card.label}
               </p>
@@ -118,10 +337,14 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         </div>
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="Daily Work">
-        <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
-          2. Daily Work
-        </h3>
+      <PageShell template={template} report={report} pageLabel="Daily Work" dark={dark} showIcon={generated}>
+        {generated ? (
+          <SectionHeading n="02" title="Daily Work" primary={primary} accent={accent} icon={Activity} />
+        ) : (
+          <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
+            2. Daily Work
+          </h3>
+        )}
         {activities.length === 0 ? (
           <p className="text-sm text-slate-500">No daily work recorded for this period.</p>
         ) : (
@@ -150,10 +373,14 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         )}
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="Helpdesk Tickets">
-        <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
-          3. Helpdesk Tickets
-        </h3>
+      <PageShell template={template} report={report} pageLabel="Helpdesk Tickets" dark={dark} showIcon={generated}>
+        {generated ? (
+          <SectionHeading n="03" title="Helpdesk Tickets" primary={primary} accent={accent} icon={Ticket} />
+        ) : (
+          <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
+            3. Helpdesk Tickets
+          </h3>
+        )}
         {tickets.length === 0 ? (
           <p className="text-sm text-slate-500">No tickets recorded for this period.</p>
         ) : (
@@ -182,10 +409,14 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         )}
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="Projects">
-        <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
-          4. Projects
-        </h3>
+      <PageShell template={template} report={report} pageLabel="Projects" dark={dark} showIcon={generated}>
+        {generated ? (
+          <SectionHeading n="04" title="Projects" primary={primary} accent={accent} icon={FolderKanban} />
+        ) : (
+          <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
+            4. Projects
+          </h3>
+        )}
         {projects.length === 0 ? (
           <p className="text-sm text-slate-500">No projects recorded.</p>
         ) : (
@@ -212,10 +443,14 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         )}
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="KPI Matrix">
-        <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
-          5. KPI Performance Matrix
-        </h3>
+      <PageShell template={template} report={report} pageLabel="KPI Matrix" dark={dark} showIcon={generated}>
+        {generated ? (
+          <SectionHeading n="05" title="KPI Performance Matrix" primary={primary} accent={accent} icon={Gauge} />
+        ) : (
+          <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
+            5. KPI Performance Matrix
+          </h3>
+        )}
         {kpis.length === 0 ? (
           <p className="text-sm text-slate-500">No KPIs recorded.</p>
         ) : (
@@ -248,10 +483,14 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         )}
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="Training">
-        <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
-          6. Training
-        </h3>
+      <PageShell template={template} report={report} pageLabel="Training" dark={dark} showIcon={generated}>
+        {generated ? (
+          <SectionHeading n="06" title="Training" primary={primary} accent={accent} icon={GraduationCap} />
+        ) : (
+          <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
+            6. Training
+          </h3>
+        )}
         {training.length === 0 ? (
           <p className="text-sm text-slate-500">No training recorded for this period.</p>
         ) : (
@@ -265,11 +504,14 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         )}
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="Narrative & Sign-off">
+      <PageShell template={template} report={report} pageLabel="Narrative & Sign-off" dark={dark} showIcon={generated}>
         <div className="space-y-5 text-sm">
+          {generated ? (
+            <SectionHeading n="07" title="Narrative and Sign-off" primary={primary} accent={accent} icon={Award} />
+          ) : null}
           <section>
             <h3 className="font-bold mb-1" style={{ color: primary }}>
-              7. Major Achievements
+              {generated ? 'Major Achievements' : '7. Major Achievements'}
             </h3>
             <p className="whitespace-pre-line">{report.majorAchievements}</p>
           </section>

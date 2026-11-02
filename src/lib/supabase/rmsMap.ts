@@ -542,8 +542,8 @@ export function templateToRow(item: ReportTemplate, companyId: string | null) {
     footer_text: item.footerText || '',
     sections_order: item.sectionsOrder || [],
     uploaded_template_name: item.uploadedTemplateName || '',
-    storage_path: '',
-    has_uploaded_file: Boolean(item.hasUploadedFile),
+    storage_path: item.storagePath || '',
+    has_uploaded_file: Boolean(item.hasUploadedFile || item.storagePath),
     detected_placeholders: item.detectedPlaceholders || [],
     updated_at: item.updatedAt
   };
@@ -565,7 +565,8 @@ export function rowToTemplate(row: Record<string, unknown>): ReportTemplate {
     footerText: text(row.footer_text),
     sectionsOrder: jsonArr(row.sections_order),
     uploadedTemplateName: text(row.uploaded_template_name) || undefined,
-    hasUploadedFile: bool(row.has_uploaded_file),
+    storagePath: text(row.storage_path) || undefined,
+    hasUploadedFile: bool(row.has_uploaded_file) || Boolean(text(row.storage_path)),
     detectedPlaceholders: jsonArr(row.detected_placeholders),
     updatedAt: text(row.updated_at)
   };
@@ -636,7 +637,7 @@ export function settingsToRow(settings: AppSettings, companyId: string) {
     business_timezone: settings.businessTimezone || 'Africa/Dar_es_Salaam',
     default_reporting_period: settings.defaultReportingPeriod || '',
     ticket_default_sla_hours: num(settings.ticketDefaultSlaHours, 8),
-    ui_theme: settings.uiTheme || 'light',
+    ui_theme: settings.uiTheme || 'navy',
     ui_font: settings.uiFont || 'jakarta',
     auto_save: settings.autoSave !== false,
     idle_timeout_minutes: num(settings.idleTimeoutMinutes, 15),

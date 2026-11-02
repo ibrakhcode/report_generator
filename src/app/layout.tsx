@@ -42,7 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      data-theme="light"
+      data-theme="navy"
       data-font="jakarta"
       suppressHydrationWarning
       className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable}`}
@@ -51,7 +51,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('hesu_ui_theme');var f=localStorage.getItem('hesu_ui_font');if(t==='midnight'||t==='navy'||t==='light')document.documentElement.dataset.theme=t;if(f==='jakarta'||f==='inter'||f==='ibm-plex'||f==='outfit'||f==='source-serif')document.documentElement.dataset.font=f;}catch(e){}"
+              "try{var t=localStorage.getItem('hesu_ui_theme');var f=localStorage.getItem('hesu_ui_font');document.documentElement.dataset.theme=(t==='midnight'||t==='navy'||t==='light')?t:'navy';if(f==='jakarta'||f==='inter'||f==='ibm-plex'||f==='outfit'||f==='source-serif')document.documentElement.dataset.font=f;}catch(e){}"
           }}
         />
       </head>

@@ -1,6 +1,7 @@
 import type PptxGenJS from 'pptxgenjs';
 import { MonthlyReportData, ReportTemplate } from '../types';
 import { hexNoHash, resolveTemplate } from '../lib/reportTheme';
+import { styleIdFromTemplate } from '../lib/templateStyles';
 import { downloadBlob, fillPptxTemplate } from '../lib/reportTokens';
 import {
   BUNDLED_DEFAULT_PPTX_NAME,
@@ -39,25 +40,67 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
 
   const NAVY = hexNoHash(template.primaryColor || '#0F2D59');
   const BLUE = hexNoHash(template.accentColor || '#1E6091');
-  const LIGHT_BG = 'F8FAFC';
-  const TEXT_DARK = '0F172A';
-  const TEXT_MUTED = '475569';
+  const styleId = styleIdFromTemplate(template);
+  const LIGHT_BG = !styleId
+    ? 'F8FAFC'
+    : styleId === 'graphite-board'
+      ? '0B1220'
+      : styleId === 'gold-brief'
+        ? 'F7F1E1'
+        : 'F8FAFC';
+  const TEXT_DARK = styleId === 'graphite-board' ? 'E2E8F0' : '0F172A';
+  const TEXT_MUTED = styleId === 'graphite-board' ? '94A3B8' : '475569';
   const WHITE = 'FFFFFF';
   const BORDER_COLOR = 'CBD5E1';
 
   // 1. SLIDE: COVER PAGE
   const slideCover = pptx.addSlide();
-  slideCover.background = { color: NAVY };
+  slideCover.background = {
+    color: !styleId ? NAVY : styleId === 'gold-brief' ? 'F7F1E1' : styleId === 'azure-grid' ? 'F8FAFC' : NAVY
+  };
 
-  // Decorative Accent bar
-  slideCover.addShape(pptx.ShapeType.rect, {
-    x: 0,
-    y: 0,
-    w: 0.3,
-    h: 7.5,
-    fill: { color: BLUE },
-    line: { color: BLUE }
-  });
+  if (styleId === 'forest-control') {
+    slideCover.addShape(pptx.ShapeType.rect, {
+      x: 0,
+      y: 0,
+      w: 4.2,
+      h: 7.5,
+      fill: { color: NAVY },
+      line: { color: NAVY }
+    });
+  } else if (styleId === 'gold-brief' || styleId === 'azure-grid') {
+    slideCover.addShape(pptx.ShapeType.rect, {
+      x: 0,
+      y: 0,
+      w: 13.33,
+      h: 1.1,
+      fill: { color: NAVY },
+      line: { color: NAVY }
+    });
+  } else if (styleId === 'graphite-board') {
+    slideCover.addShape(pptx.ShapeType.rect, {
+      x: 8.4,
+      y: 0,
+      w: 4.93,
+      h: 7.5,
+      fill: { color: BLUE },
+      line: { color: BLUE }
+    });
+  } else {
+    slideCover.addShape(pptx.ShapeType.rect, {
+      x: 0,
+      y: 0,
+      w: 0.3,
+      h: 7.5,
+      fill: { color: BLUE },
+      line: { color: BLUE }
+    });
+  }
+
+  const coverOnLight = styleId === 'gold-brief' || styleId === 'azure-grid';
+  const coverTitle = !styleId ? WHITE : coverOnLight ? NAVY : WHITE;
+  const coverKicker = !styleId ? '93C5FD' : BLUE;
+  const coverMute = !styleId ? 'E2E8F0' : coverOnLight ? '475569' : 'E2E8F0';
 
   slideCover.addText(report.companyName.toUpperCase(), {
     x: 1.0,
@@ -66,18 +109,22 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
     h: 0.6,
     fontSize: 20,
     bold: true,
-    color: '93C5FD',
+    color: coverKicker,
     fontFace: 'Arial'
   });
 
-  slideCover.addText('INFORMATION & COMMUNICATIONS TECHNOLOGY (ICT)\nMONTHLY PERFORMANCE REPORT', {
+  slideCover.addText(
+    styleId
+      ? template.headerText || 'ICT MONTHLY PERFORMANCE REPORT'
+      : 'INFORMATION & COMMUNICATIONS TECHNOLOGY (ICT)\nMONTHLY PERFORMANCE REPORT',
+    {
     x: 1.0,
     y: 2.6,
     w: 11.0,
     h: 1.5,
     fontSize: 28,
     bold: true,
-    color: WHITE,
+    color: coverTitle,
     fontFace: 'Arial'
   });
 
@@ -87,20 +134,20 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
     w: 11.0,
     h: 0.5,
     fontSize: 16,
-    color: 'E2E8F0',
+    color: coverMute,
     fontFace: 'Arial'
   });
 
   // Metadata block
   const metaBoxText = [
-    { text: 'Prepared By: ', options: { bold: true, color: '93C5FD' } },
-    { text: `${report.employeeName} (${report.employeeTitle})\n`, options: { color: WHITE } },
-    { text: 'Department: ', options: { bold: true, color: '93C5FD' } },
-    { text: `${report.department}\n`, options: { color: WHITE } },
-    { text: 'Contact Email: ', options: { bold: true, color: '93C5FD' } },
-    { text: `${report.employeeEmail}\n`, options: { color: WHITE } },
-    { text: 'Status: ', options: { bold: true, color: '93C5FD' } },
-    { text: `${report.status.toUpperCase()} (Version ${report.version})`, options: { bold: true, color: '38BDF8' } }
+    { text: 'Prepared By: ', options: { bold: true, color: coverKicker } },
+    { text: `${report.employeeName} (${report.employeeTitle})\n`, options: { color: coverTitle } },
+    { text: 'Department: ', options: { bold: true, color: coverKicker } },
+    { text: `${report.department}\n`, options: { color: coverTitle } },
+    { text: 'Contact Email: ', options: { bold: true, color: coverKicker } },
+    { text: `${report.employeeEmail}\n`, options: { color: coverTitle } },
+    { text: 'Status: ', options: { bold: true, color: coverKicker } },
+    { text: `${report.status.toUpperCase()} (Version ${report.version})`, options: { bold: true, color: coverTitle } }
   ];
 
   slideCover.addText(metaBoxText, {

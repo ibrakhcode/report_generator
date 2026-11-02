@@ -45,7 +45,7 @@ const SETTINGS_FALLBACK: AppSettings = {
   companyRegistered: false,
   activeCompanyId: '',
   companyScopeReady: false,
-  uiTheme: 'light',
+  uiTheme: 'navy',
   uiFont: 'jakarta',
   autoSave: true,
   idleTimeoutMinutes: 15,

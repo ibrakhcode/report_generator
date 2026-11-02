@@ -122,28 +122,73 @@ const LIVE_SLIDE_PLAN: { heading: string; body: (keyof ReturnType<typeof buildRe
   { heading: 'Next Month Priorities', body: ['PRIORITIES'] }
 ];
 
-function replaceTextRuns(xml: string, values: string[]): string {
+function paragraphText(pXml: string): string {
+  return Array.from(pXml.matchAll(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g))
+    .map((match) => match[1] || '')
+    .join('')
+    .replace(/<[^>]+>/g, '')
+    .trim();
+}
+
+function setParagraphText(pXml: string, value: string): string {
   let index = 0;
-  const filled = xml.replace(/<a:t([^>]*)>([\s\S]*?)<\/a:t>/g, (_full, attrs: string) => {
-    const next = values[index] ?? (index === 0 ? values[0] : ' ');
+  if (!/<a:t[\s>]/.test(pXml)) return pXml;
+  return pXml.replace(/<a:t([^>]*)>([\s\S]*?)<\/a:t>/g, (_full, attrs: string) => {
+    const next = index === 0 ? value : ' ';
     index += 1;
     return `<a:t${attrs}>${xmlSafe(next || ' ')}</a:t>`;
   });
-  return filled;
+}
+
+export type LiveSlidePlan = { heading: string; body: string };
+
+export function buildLiveSlidePlans(report: MonthlyReportData, slideCount: number): LiveSlidePlan[] {
+  const tokens = buildReportTokens(report);
+  const source = LIVE_SLIDE_PLAN.map((plan) => ({
+    heading: plan.heading,
+    body: plan.body.map((key) => tokens[key]).filter(Boolean).join('\n')
+  }));
+  const count = Math.max(1, slideCount || source.length);
+  if (count >= source.length) {
+    const extra = source.slice();
+    while (extra.length < count) {
+      extra.push({
+        heading: 'Additional notes',
+        body: [tokens.PRIORITIES, tokens.RECOMMENDATIONS, tokens.ISSUES].filter(Boolean).join('\n') ||
+          'Live operational data continues on this slide.'
+      });
+    }
+    return extra;
+  }
+  const packed: LiveSlidePlan[] = [];
+  const per = Math.ceil(source.length / count);
+  for (let index = 0; index < count; index += 1) {
+    const chunk = source.slice(index * per, Math.min(source.length, (index + 1) * per));
+    packed.push({
+      heading: chunk[0]?.heading || source[0].heading,
+      body: chunk.map((item) => `${item.heading}\n${item.body}`).join('\n\n')
+    });
+  }
+  return packed;
 }
 
 function applyLiveSlideLayout(xml: string, heading: string, body: string): string {
-  const runs = xml.match(/<a:t([^>]*)>([\s\S]*?)<\/a:t>/g) || [];
-  if (!runs.length) return xml;
-  if (runs.length === 1) {
-    return replaceTextRuns(xml, [`${heading}: ${body}`]);
-  }
-  const values = runs.map((_, i) => {
-    if (i === 0) return heading;
-    if (i === runs.length - 1) return body;
-    return ' ';
+  let frames = 0;
+  xml.replace(/<a:p\b[\s\S]*?<\/a:p>/g, (pXml) => {
+    if (/<a:t[\s>]/.test(pXml)) frames += 1;
+    return pXml;
   });
-  return replaceTextRuns(xml, values);
+  if (!frames) return xml;
+  let seen = 0;
+  return xml.replace(/<a:p\b[\s\S]*?<\/a:p>/g, (pXml) => {
+    if (!/<a:t[\s>]/.test(pXml)) return pXml;
+    const index = seen;
+    seen += 1;
+    if (frames === 1) return setParagraphText(pXml, `${heading}\n${body}`);
+    if (index === 0) return setParagraphText(pXml, heading);
+    if (index === frames - 1) return setParagraphText(pXml, body);
+    return setParagraphText(pXml, ' ');
+  });
 }
 
 function slideNumber(name: string): number {
@@ -156,27 +201,33 @@ export async function fillPptxTemplate(dataUrl: string, report: MonthlyReportDat
   const zip = await JSZip.loadAsync(await dataUrlToBuffer(dataUrl));
   const tokens = buildReportTokens(report);
   const names = Object.keys(zip.files);
+  const slides = names
+    .filter((name) => /ppt\/slides\/slide\d+\.xml$/i.test(name))
+    .sort((a, b) => slideNumber(a) - slideNumber(b));
   for (const name of names) {
     if (!/\.(xml|rels)$/i.test(name)) continue;
     const xml = await zip.files[name].async('string');
     zip.file(name, replacePlaceholdersInXml(xml, tokens));
   }
-  const slides = names
-    .filter((name) => /ppt\/slides\/slide\d+\.xml$/i.test(name))
-    .sort((a, b) => slideNumber(a) - slideNumber(b));
+  const plans = buildLiveSlidePlans(report, slides.length);
   for (let index = 0; index < slides.length; index += 1) {
     const name = slides[index];
-    const plan = LIVE_SLIDE_PLAN[Math.min(index, LIVE_SLIDE_PLAN.length - 1)];
-    const body = plan.body.map((key) => tokens[key]).filter(Boolean).join('\n');
+    const plan = plans[index] || plans[plans.length - 1];
     const file = zip.file(name);
     if (!file) continue;
     const xml = await file.async('string');
-    zip.file(name, applyLiveSlideLayout(xml, plan.heading, body));
+    zip.file(name, applyLiveSlideLayout(xml, plan.heading, plan.body));
   }
   return zip.generateAsync({
     type: 'blob',
     mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
   });
+}
+
+export async function countPptxSlides(dataUrl: string): Promise<number> {
+  const JSZip = (await import('jszip')).default;
+  const zip = await JSZip.loadAsync(await dataUrlToBuffer(dataUrl));
+  return Object.keys(zip.files).filter((name) => /ppt\/slides\/slide\d+\.xml$/i.test(name)).length;
 }
 
 async function readPptxXml(dataUrl: string): Promise<string[]> {

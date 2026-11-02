@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomInt } from 'crypto';
 import { hashPasswordServer } from '@/lib/serverPassword';
-import { sendAppEmail } from '@/lib/mailer';
+import { sendPasswordResetEmail } from '@/lib/mailer';
 import { getSupabaseServerClient, isSupabaseServerConfigured } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
@@ -42,11 +42,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const mailed = await sendAppEmail({
-    to: email,
-    subject: 'HESU ICT RMS password reset code',
-    text: `Hello ${String(data.full_name || '')},\n\nYour password reset code is: ${code}\nIt expires in 30 minutes.\n\nIf you did not ask for this, ignore this email.`
-  });
+  const mailed = await sendPasswordResetEmail(email);
   if (!mailed.ok) {
     return NextResponse.json({ ok: false, error: mailed.error }, { status: 500 });
   }

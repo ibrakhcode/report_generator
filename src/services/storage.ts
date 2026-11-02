@@ -107,7 +107,7 @@ export const INITIAL_SETTINGS: AppSettings = {
   companyRegistered: false, // Strictly false until explicitly registered by admin
   activeCompanyId: '',
   companyScopeReady: false,
-  uiTheme: 'light',
+  uiTheme: 'navy',
   uiFont: 'jakarta',
   autoSave: true,
   idleTimeoutMinutes: 15,
@@ -364,26 +364,11 @@ class StorageService {
       this.writeAllAssetRecords(data.assetRecords, { cloud: false });
     }
     if (data.settings) {
-      let appearanceTheme = data.settings.uiTheme;
-      let appearanceFont = data.settings.uiFont;
-      try {
-        const storedTheme = localStorage.getItem('hesu_ui_theme');
-        const storedFont = localStorage.getItem('hesu_ui_font');
-        if (storedTheme === 'midnight' || storedTheme === 'navy' || storedTheme === 'light') {
-          appearanceTheme = storedTheme;
-        }
-        if (
-          storedFont === 'jakarta' ||
-          storedFont === 'inter' ||
-          storedFont === 'ibm-plex' ||
-          storedFont === 'outfit' ||
-          storedFont === 'source-serif'
-        ) {
-          appearanceFont = storedFont;
-        }
-      } catch {
-        // appearance only
-      }
+      const appearanceTheme =
+        data.settings.uiTheme === 'midnight' || data.settings.uiTheme === 'navy' || data.settings.uiTheme === 'light'
+          ? data.settings.uiTheme
+          : 'navy';
+      const appearanceFont = data.settings.uiFont || 'jakarta';
       this.memWrite(
         STORAGE_KEYS.SETTINGS,
         JSON.stringify({ ...this.getSettings(), ...data.settings, uiTheme: appearanceTheme, uiFont: appearanceFont })
@@ -1113,9 +1098,16 @@ class StorageService {
       existing.hasUploadedFile = true;
       existing.uploadedTemplateName = INITIAL_TEMPLATE.uploadedTemplateName;
       existing.name = INITIAL_TEMPLATE.name;
+      existing.description = INITIAL_TEMPLATE.description;
       existing.primaryColor = INITIAL_TEMPLATE.primaryColor;
       existing.accentColor = INITIAL_TEMPLATE.accentColor;
+      existing.textColor = INITIAL_TEMPLATE.textColor;
+      existing.fontFamily = INITIAL_TEMPLATE.fontFamily;
       existing.headerText = INITIAL_TEMPLATE.headerText;
+      existing.footerText = INITIAL_TEMPLATE.footerText;
+      existing.slideFormat = INITIAL_TEMPLATE.slideFormat;
+      existing.sectionsOrder = INITIAL_TEMPLATE.sectionsOrder;
+      existing.storagePath = undefined;
       return next;
     }
     return [{ ...INITIAL_TEMPLATE, isDefault: true }, ...next.map((item) => ({ ...item, isDefault: false }))];
@@ -1136,6 +1128,12 @@ class StorageService {
   }
 
   public saveTemplate(template: ReportTemplate): ReportTemplate {
+    if (template.id === INITIAL_TEMPLATE.id) {
+      const list = this.getTemplates();
+      this.writeArray(STORAGE_KEYS.TEMPLATES, list);
+      this.notify();
+      return list.find((item) => item.id === INITIAL_TEMPLATE.id) || INITIAL_TEMPLATE;
+    }
     const list = this.getTemplates();
     const idx = list.findIndex((t) => t.id === template.id);
     const now = new Date().toISOString();
@@ -1209,7 +1207,10 @@ class StorageService {
         ...parsed,
         emailService: { ...INITIAL_SETTINGS.emailService, ...(parsed.emailService || {}) },
         whatsappService: { ...INITIAL_SETTINGS.whatsappService, ...(parsed.whatsappService || {}) },
-        uiTheme: parsed.uiTheme === 'midnight' || parsed.uiTheme === 'navy' ? parsed.uiTheme : 'light',
+        uiTheme:
+          parsed.uiTheme === 'midnight' || parsed.uiTheme === 'navy' || parsed.uiTheme === 'light'
+            ? parsed.uiTheme
+            : 'navy',
         uiFont:
           parsed.uiFont === 'inter' ||
           parsed.uiFont === 'ibm-plex' ||

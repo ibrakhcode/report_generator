@@ -60,7 +60,7 @@ export function readStoredFont(): UiFont | null {
 
 export function readStoredAppearance(): { theme: UiTheme; font: UiFont } {
   return {
-    theme: readStoredTheme() || 'light',
+    theme: readStoredTheme() || 'navy',
     font: readStoredFont() || 'jakarta'
   };
 }
@@ -72,7 +72,7 @@ export function resolveAppearance(settings?: { uiTheme?: UiTheme; uiFont?: UiFon
   const storedTheme = readStoredTheme();
   const storedFont = readStoredFont();
   return {
-    theme: storedTheme || settings?.uiTheme || 'light',
-    font: storedFont || settings?.uiFont || 'jakarta'
+    theme: settings?.uiTheme || storedTheme || 'navy',
+    font: settings?.uiFont || storedFont || 'jakarta'
   };
 }

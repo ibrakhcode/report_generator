@@ -31,6 +31,26 @@ export async function POST(request: Request) {
   }
 
   let matched = false;
+  let authUserId = '';
+  const otp = await supabase.auth.verifyOtp({
+    email,
+    token: cleanCode,
+    type: 'email'
+  });
+  if (!otp.error) {
+    matched = true;
+    authUserId = otp.data.user?.id || '';
+  } else {
+    const recoveryOtp = await supabase.auth.verifyOtp({
+      email,
+      token: cleanCode,
+      type: 'recovery'
+    });
+    if (!recoveryOtp.error) {
+      matched = true;
+      authUserId = recoveryOtp.data.user?.id || '';
+    }
+  }
   const emailed = await supabase.from('password_resets').select('*').eq('email', email).maybeSingle();
   if (emailed.data?.hash && emailed.data?.salt && emailed.data?.expires_at) {
     const stillValid = new Date(String(emailed.data.expires_at)).getTime() > Date.now();
@@ -61,6 +81,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: upd.error.message }, { status: 500 });
   }
   await supabase.from('password_resets').delete().eq('email', email);
+  if (authUserId) {
+    await supabase.auth.admin.updateUserById(authUserId, { password: String(body.newPassword) });
+  }
   return NextResponse.json({
     ok: true,
     newRecoveryCode: newCode,

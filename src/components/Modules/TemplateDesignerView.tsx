@@ -1,17 +1,19 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Upload, Save, CheckCircle2, Palette, Eye, Layers, Plus, Trash2 } from 'lucide-react';
+import { Upload, Save, CheckCircle2, Palette, Eye, Layers, Plus, Trash2, Sparkles } from 'lucide-react';
 import { ReportTemplate } from '../../types';
 import { storage } from '../../services/storage';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { REPORT_PLACEHOLDERS, detectPptxPlaceholders } from '@/lib/reportTokens';
-import { deleteTemplateFile, saveTemplateFile } from '@/lib/templateFileStore';
+import { BUNDLED_DEFAULT_TEMPLATE_ID, deleteTemplateFile, saveTemplateFile } from '@/lib/templateFileStore';
 import { ReportDocumentPreview } from '@/components/Reports/ReportDocumentPreview';
+import { TemplateLiveMode } from '@/components/Reports/TemplateLiveMode';
 import { useAppSession } from '@/context/AppSessionContext';
 import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { SuggestField } from '@/components/System/SuggestField';
+import { TEMPLATE_STYLE_PRESETS, buildGeneratedTemplate, type TemplateStyleId } from '@/lib/templateStyles';
 
 const emptyTemplate = (): ReportTemplate => ({
   id: `TMPL-${Date.now()}`,
@@ -37,6 +39,8 @@ export const TemplateDesignerView: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isReviewing, setIsReviewing] = useState(false);
+  const [liveMode, setLiveMode] = useState(false);
+  const [pendingUpload, setPendingUpload] = useState<{ dataUrl: string; saved: boolean } | null>(null);
   const settings = storage.getSettings();
   const autoSave = useAutoSaveEnabled();
   const { selectedMonth, workspaceRevision } = useAppSession();
@@ -45,6 +49,7 @@ export const TemplateDesignerView: React.FC = () => {
 
   const persistTemplate = useCallback(() => {
     if (!activeTemplate?.name?.trim()) return;
+    if (activeTemplate.id === BUNDLED_DEFAULT_TEMPLATE_ID) return;
     const saved = storage.saveTemplate({
       ...activeTemplate,
       name: activeTemplate.name.trim(),
@@ -62,8 +67,29 @@ export const TemplateDesignerView: React.FC = () => {
     notify.info('Template', text);
   };
 
+  const handleGenerate = async (styleId: TemplateStyleId) => {
+    const generated = buildGeneratedTemplate(styleId, storage.getTemplates());
+    const saved = storage.saveTemplate(generated);
+    const ok = await storage.waitForLastPersist();
+    setActiveTemplate(saved);
+    setTemplates(storage.getTemplates());
+    setSaveSuccess(true);
+    window.setTimeout(() => setSaveSuccess(false), 3000);
+    if (!ok) {
+      flash(storage.getLastPersistError() || 'Template created locally. Cloud save did not finish.');
+      return;
+    }
+    flash(`${saved.name} generated and saved. You can generate more styles and keep each one.`);
+    setIsReviewing(true);
+  };
+
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (activeTemplate.id === BUNDLED_DEFAULT_TEMPLATE_ID) {
+      flash('The default ICT Monthly Report 2026 template is locked and has been restored.');
+      setActiveTemplate(storage.getTemplates().find((item) => item.id === BUNDLED_DEFAULT_TEMPLATE_ID) || activeTemplate);
+      return;
+    }
     if (!activeTemplate.name.trim()) {
       flash('Enter a template name.');
       return;
@@ -91,24 +117,25 @@ export const TemplateDesignerView: React.FC = () => {
         const dataUrl = String(reader.result || '');
         const detected = await detectPptxPlaceholders(dataUrl);
         const next: ReportTemplate = {
-          ...activeTemplate,
-          id: activeTemplate.id || `TMPL-${Date.now()}`,
+          ...emptyTemplate(),
+          id: `TMPL-upload-${Date.now()}`,
+          name: file.name.replace(/\.[^/.]+$/, '') || 'Uploaded template',
           uploadedTemplateName: file.name,
           hasUploadedFile: true,
           detectedPlaceholders: detected,
-          name: activeTemplate.name?.startsWith('New report') ? file.name.replace(/\.[^/.]+$/, '') : activeTemplate.name
+          primaryColor: activeTemplate.primaryColor,
+          accentColor: activeTemplate.accentColor,
+          textColor: activeTemplate.textColor,
+          fontFamily: activeTemplate.fontFamily,
+          slideFormat: activeTemplate.slideFormat
         };
-        await saveTemplateFile(next.id, dataUrl);
-        const saved = storage.saveTemplate(next);
-        setActiveTemplate({ ...saved, hasUploadedFile: true, detectedPlaceholders: detected });
-        setTemplates(storage.getTemplates());
-        flash(
-          detected.length
-            ? `Template saved. Live tokens found: ${detected.join(', ')}. Delivery will also rearrange headings.`
-            : 'Template saved as-is. Delivery will rearrange headings and fill live report content.'
-        );
+        await saveTemplateFile(next.id, dataUrl, { persistRemote: false });
+        setActiveTemplate(next);
+        setPendingUpload({ dataUrl, saved: false });
+        setLiveMode(true);
+        flash('Uploaded. Original text is removed and replaced with this month live report. Save if you want it in the template list.');
       } catch (err) {
-        flash(err instanceof Error ? err.message : 'Could not save the uploaded template.');
+        flash(err instanceof Error ? err.message : 'Could not read the uploaded template.');
       }
     };
     reader.readAsDataURL(file);
@@ -120,7 +147,7 @@ export const TemplateDesignerView: React.FC = () => {
         <div>
           <h2 className="text-xl font-bold text-white">Report Template Designer</h2>
           <p className="text-xs text-slate-400 mt-1">
-            Design only: colors, slide size, header/footer, and optional PPTX layout. Report numbers always come from Daily Work, Helpdesk, and Projects for the month selected in the top bar.
+            Attach any PowerPoint. After upload the studio opens Live mode: it keeps that design, deletes the attached wording, and places this system&apos;s headings and live data.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -137,7 +164,13 @@ export const TemplateDesignerView: React.FC = () => {
           </button>
           <button
             type="button"
-            onClick={() => setIsReviewing(true)}
+            onClick={() => {
+              if (activeTemplate.hasUploadedFile || activeTemplate.uploadedTemplateName) {
+                setLiveMode(true);
+                return;
+              }
+              setIsReviewing(true);
+            }}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-bold text-white inline-flex items-center gap-1.5"
           >
             <Eye className="w-4 h-4" />
@@ -150,6 +183,36 @@ export const TemplateDesignerView: React.FC = () => {
             <Save className="w-4 h-4" />
             Save template
           </button>
+        </div>
+      </div>
+
+      <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4">
+        <h3 className="text-sm font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-700">
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          Auto-generate a styled template
+        </h3>
+        <p className="text-xs text-slate-300">
+          Pick a look. The studio builds a finished template with its own colors, icons, spacing, and arrangement, then saves it. Generate as many as you need; each style stays as its own saved template.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+          {TEMPLATE_STYLE_PRESETS.map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => void handleGenerate(preset.id)}
+              className="text-left rounded-2xl border border-slate-700 overflow-hidden hover:border-cyan-500 transition-colors"
+            >
+              <div className="h-16 px-4 flex items-end pb-3" style={{ backgroundColor: preset.primaryColor }}>
+                <span className="text-[10px] font-bold tracking-widest uppercase" style={{ color: preset.accentColor }}>
+                  {preset.layout}
+                </span>
+              </div>
+              <div className="px-4 py-3 bg-slate-900">
+                <span className="block text-sm font-bold text-white">{preset.name}</span>
+                <span className="block text-[11px] text-slate-400 mt-1">{preset.tagline}</span>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -259,7 +322,7 @@ export const TemplateDesignerView: React.FC = () => {
               Upload PPTX template
             </h3>
             <p className="text-xs text-slate-300">
-              Upload any PowerPoint. Layout and style stay. Headings are rearranged and wording is filled with this month&apos;s live report.
+              Upload any PowerPoint, even if it is not a report. The system keeps the look, then Live mode clears its content and fills system headings plus this month&apos;s data.
             </p>
             <p className="text-[11px] text-slate-400 font-mono break-all">
               {REPORT_PLACEHOLDERS.map((token) => `{{${token}}}`).join('  ')}
@@ -270,8 +333,15 @@ export const TemplateDesignerView: React.FC = () => {
               <input type="file" accept=".pptx" onChange={handleUpload} className="hidden" />
             </label>
             {activeTemplate.hasUploadedFile || activeTemplate.uploadedTemplateName ? (
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-300 text-xs space-y-1">
+              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-300 text-xs space-y-2">
                 <p>File stored: {activeTemplate.uploadedTemplateName}</p>
+                <button
+                  type="button"
+                  onClick={() => setLiveMode(true)}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold"
+                >
+                  Open live mode
+                </button>
                 <p>
                   Tokens found:{' '}
                   {(activeTemplate.detectedPlaceholders || []).length
@@ -337,6 +407,10 @@ export const TemplateDesignerView: React.FC = () => {
           <button
             type="button"
             onClick={async () => {
+              if (activeTemplate.id === BUNDLED_DEFAULT_TEMPLATE_ID) {
+                flash('The default ICT Monthly Report 2026 template cannot be deleted.');
+                return;
+              }
               const ok = await notify.confirm('Delete template', 'Delete this template?', 'Delete');
               if (!ok) return;
               await deleteTemplateFile(activeTemplate.id);
@@ -371,6 +445,36 @@ export const TemplateDesignerView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {liveMode && (
+        <TemplateLiveMode
+          template={activeTemplate}
+          report={liveReport}
+          month={selectedMonth}
+          sourceDataUrl={pendingUpload?.dataUrl}
+          unsaved={Boolean(pendingUpload && !pendingUpload.saved)}
+          onSave={async () => {
+            if (!pendingUpload) return;
+            const storagePath = await saveTemplateFile(activeTemplate.id, pendingUpload.dataUrl);
+            const saved = storage.saveTemplate({
+              ...activeTemplate,
+              storagePath,
+              hasUploadedFile: true
+            });
+            const ok = await storage.waitForLastPersist();
+            setActiveTemplate(saved);
+            setTemplates(storage.getTemplates());
+            setPendingUpload({ ...pendingUpload, saved: true });
+            if (!ok) throw new Error(storage.getLastPersistError() || 'Could not save the template.');
+          }}
+          onClose={() => {
+            setLiveMode(false);
+            if (pendingUpload && !pendingUpload.saved) {
+              setPendingUpload(null);
+            }
+          }}
+        />
+      )}
 
       {isReviewing && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-stretch justify-center p-4">

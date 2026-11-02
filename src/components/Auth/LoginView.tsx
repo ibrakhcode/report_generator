@@ -110,7 +110,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
     try {
       const res = await auth.requestPasswordResetEmail(email);
       if (res.success) {
-        setSuccessMsg('If that account exists, a reset code was sent to the email.');
+        setSuccessMsg('If that account exists, Supabase sent a reset code to the email.');
       } else {
         setErrorMsg(res.error || 'Could not send the reset email.');
       }
@@ -398,7 +398,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
                 />
               </div>
               <div>
-                <label className={labelClass}>Email or recovery code *</label>
+                <label className={labelClass}>Email code or recovery code *</label>
                 <input
                   type="text"
                   required

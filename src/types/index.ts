@@ -283,6 +283,7 @@ export interface ReportTemplate {
   sectionsOrder: string[];
   uploadedTemplateName?: string;
   uploadedTemplateData?: string;
+  storagePath?: string;
   hasUploadedFile?: boolean;
   detectedPlaceholders?: string[];
   updatedAt: string;

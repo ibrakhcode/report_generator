@@ -7,7 +7,7 @@ import { storage } from '@/services/storage';
 import type { UiTheme } from '@/types';
 
 export function PublicAppearanceBar() {
-  const [theme, setTheme] = useState<UiTheme>('light');
+  const [theme, setTheme] = useState<UiTheme>('navy');
 
   useEffect(() => {
     const next = resolveAppearance(storage.getSettings());
@@ -19,7 +19,6 @@ export function PublicAppearanceBar() {
     const settings = storage.getSettings();
     setTheme(next);
     applyAppearance(next, settings.uiFont || 'jakarta');
-    storage.saveSettings({ ...settings, uiTheme: next }, { silent: true });
   };
 
   return (

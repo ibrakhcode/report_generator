@@ -26,5 +26,5 @@ export async function POST(req: NextRequest) {
   if (!mailed.ok) {
     return NextResponse.json({ ok: false, error: mailed.error }, { status: 502 });
   }
-  return NextResponse.json({ ok: true, channel: 'resend' });
+  return NextResponse.json({ ok: true, channel: 'supabase' });
 }
