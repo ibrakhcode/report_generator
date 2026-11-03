@@ -221,7 +221,7 @@ I can help you review your permitted modules, record daily activities, troublesh
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] min-h-[580px] bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-xl">
+    <div className="flex flex-col h-full min-h-0 bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl backdrop-blur-xl">
       {/* Top Logics AI Bar */}
       <div className="bg-slate-950/90 border-b border-slate-800 px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">

@@ -7,6 +7,9 @@ import { storage } from '@/services/storage';
 import { useAutoSave, useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { TableTextFilter, tableIncludes } from '@/components/System/TableColumnFilter';
 
 const FIELD_TYPES: AssetFieldType[] = ['text', 'number', 'date', 'textarea', 'select'];
 
@@ -30,6 +33,9 @@ export function AssetMasterView() {
   const [recordValues, setRecordValues] = useState<Record<string, string>>({});
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [assetNameFilter, setAssetNameFilter] = useState('');
+  const [assetTypeFilter, setAssetTypeFilter] = useState('');
+  const [assetDataFilter, setAssetDataFilter] = useState('');
 
   const selectedType = useMemo(
     () => definitions.find((item) => item.id === selectedTypeId) || definitions[0],
@@ -158,9 +164,24 @@ export function AssetMasterView() {
   };
 
   const typeRecords = records.filter((item) => !selectedType || item.definitionId === selectedType.id);
+  const filteredRecords = typeRecords.filter((item) => {
+    const type = definitions.find((def) => def.id === item.definitionId);
+    const dataText = (type?.fields || [])
+      .map((field) => `${field.label}: ${item.values[field.id] || '-'}`)
+      .join(' ');
+    return (
+      tableIncludes(item.name, assetNameFilter) &&
+      tableIncludes(type?.name || '', assetTypeFilter) &&
+      tableIncludes(dataText, assetDataFilter)
+    );
+  });
+  const paged = usePagedList(
+    filteredRecords,
+    `${selectedType?.id || 'all'}-${assetNameFilter}-${assetTypeFilter}-${assetDataFilter}`
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -198,8 +219,8 @@ export function AssetMasterView() {
       )}
 
       {tab === 'define' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 space-y-2">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-4 space-y-2 min-h-0 overflow-auto">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-white">Asset types</h3>
               <button type="button" onClick={startNewType} className="text-xs text-teal-400 inline-flex items-center gap-1">
@@ -225,7 +246,7 @@ export function AssetMasterView() {
             ))}
           </div>
 
-          <div className="lg:col-span-2 bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4">
+          <div className="lg:col-span-2 min-h-0 overflow-auto bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4">
             <div>
               <label className="block text-xs text-slate-400 font-semibold mb-1">Asset type name *</label>
               <input
@@ -327,8 +348,8 @@ export function AssetMasterView() {
       )}
 
       {tab === 'record' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+          <div className="min-h-0 overflow-auto bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4">
             {selectedType?.systemKey !== 'company' && (
               <p className="text-[11px] text-slate-400">
                 Recording for <span className="text-teal-300 font-semibold">{storage.getSettings().companyName || 'the selected company'}</span>. Switch company in the top bar to work in another workspace.
@@ -427,25 +448,38 @@ export function AssetMasterView() {
             )}
           </div>
 
-          <div className="lg:col-span-2 bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-900 text-slate-400">
+          <div className="lg:col-span-2 min-h-0 bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden flex flex-col">
+            <div className="flex-1 min-h-0 overflow-auto">
+            <table className="w-full text-left text-xs border-separate border-spacing-0">
+              <thead className="sticky top-0 z-20 bg-slate-900 [&_th]:bg-slate-900 text-slate-400">
                 <tr>
                   <th className="py-3 px-4">Asset</th>
                   <th className="py-3 px-4">Type</th>
                   <th className="py-3 px-4">Required data</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
+                <tr className="border-b border-slate-800">
+                  <th className="py-2 px-4 font-normal">
+                    <TableTextFilter value={assetNameFilter} onChange={setAssetNameFilter} placeholder="Asset" />
+                  </th>
+                  <th className="py-2 px-4 font-normal">
+                    <TableTextFilter value={assetTypeFilter} onChange={setAssetTypeFilter} placeholder="Type" />
+                  </th>
+                  <th className="py-2 px-4 font-normal">
+                    <TableTextFilter value={assetDataFilter} onChange={setAssetDataFilter} placeholder="Data" />
+                  </th>
+                  <th className="py-2 px-4" />
+                </tr>
               </thead>
               <tbody className="divide-y divide-slate-800 text-slate-300">
-                {typeRecords.length === 0 && (
+                {filteredRecords.length === 0 && (
                   <tr>
                     <td colSpan={4} className="py-10 text-center text-slate-500">
                       No assets recorded yet.
                     </td>
                   </tr>
                 )}
-                {typeRecords.map((item) => {
+                {paged.pageItems.map((item) => {
                   const type = definitions.find((def) => def.id === item.definitionId);
                   return (
                     <tr key={item.id}>
@@ -479,6 +513,14 @@ export function AssetMasterView() {
                 })}
               </tbody>
             </table>
+            </div>
+            <PageBar
+              total={paged.total}
+              page={paged.page}
+              pageCount={paged.pageCount}
+              pageSize={paged.pageSize}
+              onPage={paged.setPage}
+            />
           </div>
         </div>
       )}

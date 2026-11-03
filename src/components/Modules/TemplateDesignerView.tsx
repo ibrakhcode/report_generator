@@ -14,6 +14,8 @@ import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
 import { SuggestField } from '@/components/System/SuggestField';
 import { TEMPLATE_STYLE_PRESETS, buildGeneratedTemplate, type TemplateStyleId } from '@/lib/templateStyles';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
 
 const emptyTemplate = (): ReportTemplate => ({
   id: `TMPL-${Date.now()}`,
@@ -45,6 +47,7 @@ export const TemplateDesignerView: React.FC = () => {
   const autoSave = useAutoSaveEnabled();
   const { selectedMonth, workspaceRevision } = useAppSession();
   const liveReport = storage.getDeliveryReport(selectedMonth);
+  const paged = usePagedList(templates);
   void workspaceRevision;
 
   const persistTemplate = useCallback(() => {
@@ -142,7 +145,7 @@ export const TemplateDesignerView: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <form onSubmit={handleSave} className="h-full min-h-0 overflow-y-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white">Report Template Designer</h2>
@@ -371,7 +374,7 @@ export const TemplateDesignerView: React.FC = () => {
                 onAction={() => setActiveTemplate(emptyTemplate())}
               />
             ) : null}
-            {templates.map((tmpl) => (
+            {paged.pageItems.map((tmpl) => (
               <button
                 key={tmpl.id}
                 type="button"
@@ -390,6 +393,13 @@ export const TemplateDesignerView: React.FC = () => {
                 </span>
               </button>
             ))}
+            <PageBar
+              total={paged.total}
+              page={paged.page}
+              pageCount={paged.pageCount}
+              pageSize={paged.pageSize}
+              onPage={paged.setPage}
+            />
           </div>
           <button
             type="button"

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Sliders, Save, CheckCircle2, Shield, Globe, Mail, Palette, Type } from 'lucide-react';
+import { Sliders, Save, CheckCircle2, Shield, Globe, Mail, Palette, Type, LifeBuoy } from 'lucide-react';
 import { AppSettings, UiFont, UiTheme } from '../../types';
 import { storage } from '../../services/storage';
 import { UI_FONTS, UI_THEMES, applyAppearance } from '../../lib/appearance';
@@ -58,7 +58,7 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 overflow-y-auto space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -320,6 +320,22 @@ export const SettingsView: React.FC = () => {
             <Shield className="w-3.5 h-3.5 text-emerald-400" />
             <span>Credentials stored securely; never displayed in browser logs or client payloads.</span>
           </div>
+        </div>
+
+        <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-3 md:col-span-2">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-700">
+            <LifeBuoy className="w-4 h-4 text-emerald-400" />
+            <span>External helpdesk ingest</span>
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Cyclic sync reads the full HESU Help Desk as admin: unassigned tickets and every agent, plus tickets assigned to Ibrahim Msambwe. New assignments to Ibrahim show as notifications. Email Agent still records pasted mail.
+          </p>
+          <p className="text-[11px] font-mono text-emerald-300 break-all">
+            POST /api/rms/tickets/ingest
+          </p>
+          <p className="text-[11px] text-slate-500">
+            Header: <span className="font-mono">Authorization: Bearer TICKET_INGEST_SECRET</span>
+          </p>
         </div>
 
         <div className="md:col-span-2 flex justify-end">

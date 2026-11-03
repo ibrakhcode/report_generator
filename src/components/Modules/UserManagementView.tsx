@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Users,
   Plus,
@@ -25,6 +25,9 @@ import { notify } from '@/lib/systemNotify';
 import { ADMIN_ONLY_MODULE_IDS, MANAGER_ONLY_MODULE_IDS, isManagerRole } from '@/context/AppSessionContext';
 import { SuggestField } from '@/components/System/SuggestField';
 import { APP_MODULES, AppModule } from '../Navigation/ModuleRegistry';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { TableSelectFilter, TableTextFilter, tableIncludes } from '@/components/System/TableColumnFilter';
 
 interface UserManagementViewProps {
   currentUser?: User | null;
@@ -36,6 +39,27 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const isAdmin = Boolean(isImani || currentUser?.role?.toLowerCase() === 'admin' || currentUser?.role?.toLowerCase() === 'administrator');
 
   const [users, setUsers] = useState<User[]>(() => storage.getCompanyUsers(currentUser?.companyId));
+  const [userColFilter, setUserColFilter] = useState('');
+  const [titleColFilter, setTitleColFilter] = useState('');
+  const [roleColFilter, setRoleColFilter] = useState('All');
+  const [moduleColFilter, setModuleColFilter] = useState('');
+  const [statusColFilter, setStatusColFilter] = useState('All');
+  const filteredUsers = useMemo(() => {
+    return users.filter((u) => {
+      const matchUser = tableIncludes(`${u.fullName} ${u.email}`, userColFilter);
+      const matchTitle = tableIncludes(`${u.title} ${u.department}`, titleColFilter);
+      const matchRole = roleColFilter === 'All' || u.role === roleColFilter;
+      const matchModule = tableIncludes((u.allowedModules || []).join(' '), moduleColFilter);
+      const matchStatus =
+        statusColFilter === 'All' ||
+        (statusColFilter === 'Active' ? u.active : !u.active);
+      return matchUser && matchTitle && matchRole && matchModule && matchStatus;
+    });
+  }, [users, userColFilter, titleColFilter, roleColFilter, moduleColFilter, statusColFilter]);
+  const paged = usePagedList(
+    filteredUsers,
+    `${userColFilter}-${titleColFilter}-${roleColFilter}-${moduleColFilter}-${statusColFilter}`
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPermissionModalOpen, setIsPermissionModalOpen] = useState(false);
   const [selectedUserForPerms, setSelectedUserForPerms] = useState<User | null>(null);
@@ -257,7 +281,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   const categories = ['Operations', 'Reporting', 'Governance', 'Extended'] as const;
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Top Banner & Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -320,10 +344,10 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       )}
 
       {/* Users & Module Permissions Table */}
-      <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-700">
+      <div className="flex-1 min-h-0 bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <thead className="sticky top-0 z-20 bg-slate-900 [&_th]:bg-slate-900 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-700">
               <tr>
                 <th className="py-3 px-4">User</th>
                 <th className="py-3 px-4">Designation & Dept</th>
@@ -332,16 +356,38 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
+              <tr className="border-b border-slate-700">
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={userColFilter} onChange={setUserColFilter} placeholder="Name or email" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={titleColFilter} onChange={setTitleColFilter} placeholder="Title or dept" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter
+                    value={roleColFilter}
+                    onChange={setRoleColFilter}
+                    options={['All', ...Array.from(new Set(users.map((u) => u.role).filter(Boolean)))]}
+                  />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={moduleColFilter} onChange={setModuleColFilter} placeholder="Module" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={statusColFilter} onChange={setStatusColFilter} options={['All', 'Active', 'Disabled']} />
+                </th>
+                <th className="py-2 px-4" />
+              </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/60 text-slate-300">
-              {users.length === 0 ? (
+              {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-500">
                     No additional user accounts created yet.
                   </td>
                 </tr>
               ) : (
-                users.map((u) => {
+                paged.pageItems.map((u) => {
                   const isUserAdmin = u.role?.toLowerCase() === 'admin' || u.email.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase();
                   const userMods = Array.isArray(u.allowedModules) && u.allowedModules.length > 0
                     ? u.allowedModules
@@ -455,6 +501,13 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
             </tbody>
           </table>
         </div>
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
       </div>
 
       {/* MODAL 1: Create or Edit User with Module Assignment */}

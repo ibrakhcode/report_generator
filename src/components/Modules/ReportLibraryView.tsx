@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Download, Eye, FolderPlus, Plus, Search, Trash2, Upload, X, Folder } from 'lucide-react';
+import { Download, Eye, FolderPlus, Plus, Trash2, Upload, X, Folder } from 'lucide-react';
 import { notify } from '@/lib/systemNotify';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { TableTextFilter } from '@/components/System/TableColumnFilter';
 
 type LibraryFolder = { id: string; name: string };
 type LibraryFile = {
@@ -20,6 +23,9 @@ export const ReportLibraryView: React.FC = () => {
   const [files, setFiles] = useState<LibraryFile[]>([]);
   const [folderId, setFolderId] = useState('');
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [sizeFilter, setSizeFilter] = useState('');
+  const [uploadedFilter, setUploadedFilter] = useState('');
   const [newFolderName, setNewFolderName] = useState('');
   const [description, setDescription] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -39,14 +45,25 @@ export const ReportLibraryView: React.FC = () => {
     setFolderId((current) => current || next[0]?.id || '');
   };
 
-  const loadFiles = async (id: string, q: string) => {
+  const loadFiles = async (
+    id: string,
+    q: string,
+    type: string,
+    size: string,
+    uploaded: string
+  ) => {
     if (!id) {
       setFiles([]);
       return;
     }
-    const response = await fetch(
-      `/api/rms/report-library/files?folderId=${encodeURIComponent(id)}&q=${encodeURIComponent(q)}`
-    );
+    const params = new URLSearchParams({
+      folderId: id,
+      q,
+      type,
+      size,
+      uploaded
+    });
+    const response = await fetch(`/api/rms/report-library/files?${params.toString()}`);
     const payload = (await response.json()) as { files?: LibraryFile[] };
     setFiles(payload.files || []);
   };
@@ -57,10 +74,12 @@ export const ReportLibraryView: React.FC = () => {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadFiles(folderId, search);
+      void loadFiles(folderId, search, typeFilter, sizeFilter, uploadedFilter);
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [folderId, search]);
+  }, [folderId, search, typeFilter, sizeFilter, uploadedFilter]);
+
+  const paged = usePagedList(files, `${folderId}-${search}-${typeFilter}-${sizeFilter}-${uploadedFilter}`);
 
   const createFolder = async () => {
     const name = newFolderName.trim();
@@ -146,7 +165,7 @@ export const ReportLibraryView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-white">Report Library</h2>
@@ -162,8 +181,8 @@ export const ReportLibraryView: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 min-h-[480px]">
-        <aside className="bg-slate-900/70 border border-slate-800 rounded-2xl p-3 space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-4 flex-1 min-h-0">
+        <aside className="bg-slate-900/70 border border-slate-800 rounded-2xl p-3 space-y-3 min-h-0 overflow-auto">
           <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-1">Folders</p>
           <div className="flex gap-2">
             <input
@@ -201,17 +220,8 @@ export const ReportLibraryView: React.FC = () => {
           </div>
         </aside>
 
-        <section className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-4">
+        <section className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4 space-y-4 min-h-0 flex flex-col overflow-hidden">
           <div className="flex flex-col sm:flex-row gap-2">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search report file name..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white"
-              />
-            </div>
             <label className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 rounded-xl text-xs font-bold text-white cursor-pointer">
               <Upload className="w-4 h-4" />
               <span>{uploading ? 'Uploading...' : 'Upload report'}</span>
@@ -234,16 +244,16 @@ export const ReportLibraryView: React.FC = () => {
             className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white"
           />
 
-          {files.length === 0 ? (
+          {files.length === 0 && !search && !typeFilter && !sizeFilter && !uploadedFilter ? (
             <div className="text-center py-16 space-y-2">
               <Plus className="w-8 h-8 text-slate-600 mx-auto" />
               <p className="text-sm font-semibold text-white">No reports in this folder yet</p>
               <p className="text-xs text-slate-400">Upload PDF, PowerPoint, Word, or image files from your computer.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead>
+          <div className="flex-1 min-h-0 overflow-auto">
+            <table className="w-full text-left text-xs border-separate border-spacing-0">
+                <thead className="sticky top-0 z-20 bg-slate-900 [&_th]:bg-slate-900">
                   <tr className="text-slate-400 border-b border-slate-800">
                     <th className="py-2 pr-3 font-semibold">File name</th>
                     <th className="py-2 pr-3 font-semibold">Type</th>
@@ -251,9 +261,24 @@ export const ReportLibraryView: React.FC = () => {
                     <th className="py-2 pr-3 font-semibold">Uploaded</th>
                     <th className="py-2 font-semibold text-right">Actions</th>
                   </tr>
+                  <tr className="border-b border-slate-800">
+                    <th className="py-2 pr-3 font-normal">
+                      <TableTextFilter value={search} onChange={setSearch} placeholder="File name" />
+                    </th>
+                    <th className="py-2 pr-3 font-normal">
+                      <TableTextFilter value={typeFilter} onChange={setTypeFilter} placeholder="Type" />
+                    </th>
+                    <th className="py-2 pr-3 font-normal">
+                      <TableTextFilter value={sizeFilter} onChange={setSizeFilter} placeholder="Size" />
+                    </th>
+                    <th className="py-2 pr-3 font-normal">
+                      <TableTextFilter value={uploadedFilter} onChange={setUploadedFilter} placeholder="Uploaded" />
+                    </th>
+                    <th className="py-2" />
+                  </tr>
                 </thead>
                 <tbody>
-                  {files.map((file) => (
+                  {paged.pageItems.map((file) => (
                     <tr key={file.id} className="border-b border-slate-800/80 text-slate-200">
                       <td className="py-2.5 pr-3">
                         <span className="font-semibold text-white">{file.file_name}</span>
@@ -296,6 +321,15 @@ export const ReportLibraryView: React.FC = () => {
               </table>
             </div>
           )}
+          {files.length > 0 ? (
+            <PageBar
+              total={paged.total}
+              page={paged.page}
+              pageCount={paged.pageCount}
+              pageSize={paged.pageSize}
+              onPage={paged.setPage}
+            />
+          ) : null}
         </section>
       </div>
 

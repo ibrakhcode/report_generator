@@ -54,7 +54,7 @@ export function EmailAgentView() {
         category: 'Email',
         applicationOrDevice: 'Email intake',
         priority: 'Medium',
-        assignedTechnician: user?.fullName || 'ICT Support',
+        assignedTechnician: 'Ibrahim Msambwe',
         status: 'Open',
         slaTargetHours: storage.getSettings().ticketDefaultSlaHours || 8,
         slaBreached: false,
@@ -121,14 +121,14 @@ export function EmailAgentView() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 overflow-y-auto space-y-6">
       <div>
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <Inbox className="w-5 h-5 text-teal-400" />
           <span>Email Intake Agent</span>
         </h2>
         <p className="text-xs text-slate-400 mt-1">
-          This workspace cannot read your mailbox automatically. Paste a forwarded email and the agent will record it as a support ticket or daily activity.
+          This workspace cannot read your mailbox automatically. Paste a forwarded email and the agent will record it as a support ticket assigned to Ibrahim Msambwe, plus a daily activity.
         </p>
       </div>
 

@@ -10,6 +10,7 @@ import { APP_MODULES } from '@/components/Navigation/ModuleRegistry';
 import { modulesInGroup } from '@/lib/menuGroups';
 import { MODULE_ROUTES, pathToModuleId } from '@/lib/moduleRoutes';
 import { IdleLockScreen } from '@/components/System/IdleLockScreen';
+import { readSelectedMonth, writeSelectedMonth } from '@/lib/selectedMonth';
 
 export const ADMIN_ONLY_MODULE_IDS = ['users', 'backup'];
 export const MANAGER_ONLY_MODULE_IDS = ['kpis'];
@@ -55,7 +56,7 @@ function allowedModuleIds(user: User | null): string[] {
   };
   if (isAdmin) return forRole(APP_MODULES.map((m) => m.id));
   if (user?.allowedModules && user.allowedModules.length > 0) return forRole(user.allowedModules);
-  return forRole(['dashboard', 'activities', 'tickets']);
+  return forRole(['dashboard', 'activities', 'tickets', 'email-agent']);
 }
 
 export function AppSessionProvider({ children }: { children: React.ReactNode }) {
@@ -65,7 +66,7 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [companyRegistered, setCompanyRegistered] = useState(false);
   const [activeCompanyId, setActiveCompanyIdState] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonthState] = useState(() => readSelectedMonth());
   const [isLauncherOpen, setIsLauncherOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [pendingModuleId, setPendingModuleId] = useState<string | null>(null);
@@ -91,11 +92,10 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
     void (async () => {
       await auth.restoreCloudSession();
       if (cancelled) return;
-      if (auth.getCurrentUser()) {
+        if (auth.getCurrentUser()) {
         await storage.syncFromCloud();
         if (cancelled) return;
-        const period = storage.getSettings().defaultReportingPeriod;
-        if (period) setSelectedMonth(period);
+        setSelectedMonthState(readSelectedMonth());
       }
       refreshSession();
       setReady(true);
@@ -178,6 +178,11 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
     };
   }, [currentUser]);
 
+  const setSelectedMonth = useCallback((month: string) => {
+    writeSelectedMonth(month);
+    setSelectedMonthState(month);
+  }, []);
+
   const logout = useCallback(() => {
     const account = auth.getCurrentUser();
     goodbyeUser(account?.fullName, account?.email);
@@ -213,6 +218,7 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
       activeCompanyId,
       setActiveCompanyId,
       selectedMonth,
+      setSelectedMonth,
       isLauncherOpen,
       pathname,
       selectModule,

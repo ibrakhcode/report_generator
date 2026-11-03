@@ -7,6 +7,8 @@ import {
   EvidenceFile,
   TrainingRecord,
   MonthlyReportData,
+  ReportPost,
+  ReportPostSource,
   ReportTemplate,
   AuditLogEntry,
   AppSettings,
@@ -16,6 +18,7 @@ import {
   MasterSystemKey
 } from '../types';
 import type { RmsCollection } from '@/lib/supabase/rmsMap';
+import { inYearMonth, projectSpansMonth } from '@/lib/selectedMonth';
 
 const STORAGE_KEYS = {
   ACTIVITIES: 'hesu_app_activities_v4',
@@ -26,6 +29,7 @@ const STORAGE_KEYS = {
   EVIDENCE: 'hesu_app_evidence_v4',
   TRAINING: 'hesu_app_training_v4',
   REPORTS: 'hesu_app_reports_v4',
+  REPORT_POSTS: 'hesu_app_report_posts_v4',
   TEMPLATES: 'hesu_app_templates_v4',
   SETTINGS: 'hesu_app_settings_v4',
   AUDIT: 'hesu_app_audit_v4',
@@ -42,7 +46,8 @@ const OPERATIONAL_KEYS = [
   STORAGE_KEYS.KPIS,
   STORAGE_KEYS.EVIDENCE,
   STORAGE_KEYS.TRAINING,
-  STORAGE_KEYS.REPORTS
+  STORAGE_KEYS.REPORTS,
+  STORAGE_KEYS.REPORT_POSTS
 ];
 
 const KEY_TO_COLLECTION: Record<string, RmsCollection> = {
@@ -54,6 +59,7 @@ const KEY_TO_COLLECTION: Record<string, RmsCollection> = {
   [STORAGE_KEYS.EVIDENCE]: 'evidence',
   [STORAGE_KEYS.TRAINING]: 'training',
   [STORAGE_KEYS.REPORTS]: 'reports',
+  [STORAGE_KEYS.REPORT_POSTS]: 'reportPosts',
   [STORAGE_KEYS.TEMPLATES]: 'templates'
 };
 
@@ -294,6 +300,7 @@ class StorageService {
         evidence?: EvidenceFile[];
         training?: TrainingRecord[];
         reports?: MonthlyReportData[];
+        reportPosts?: ReportPost[];
         templates?: ReportTemplate[];
         users?: User[];
         audit?: AuditLogEntry[];
@@ -321,8 +328,9 @@ class StorageService {
     kpis?: KpiItem[];
     evidence?: EvidenceFile[];
     training?: TrainingRecord[];
-    reports?: MonthlyReportData[];
-    templates?: ReportTemplate[];
+        reports?: MonthlyReportData[];
+        reportPosts?: ReportPost[];
+        templates?: ReportTemplate[];
     users?: User[];
     audit?: AuditLogEntry[];
     assetDefinitions?: AssetDefinition[];
@@ -348,6 +356,7 @@ class StorageService {
     takeMerged(data.evidence, this.getEvidence(), STORAGE_KEYS.EVIDENCE, 'evidence');
     takeMerged(data.training, this.getTraining(), STORAGE_KEYS.TRAINING, 'training');
     takeMerged(data.reports, this.getReports(), STORAGE_KEYS.REPORTS, 'reports');
+    takeMerged(data.reportPosts, this.getReportPosts(), STORAGE_KEYS.REPORT_POSTS, 'reportPosts');
     if (data.templates) {
       this.writeArray(STORAGE_KEYS.TEMPLATES, data.templates, { cloud: false });
     }
@@ -661,6 +670,9 @@ class StorageService {
     if (!this.memRead(STORAGE_KEYS.REPORTS)) {
       this.memWrite(STORAGE_KEYS.REPORTS, JSON.stringify([]));
     }
+    if (!this.memRead(STORAGE_KEYS.REPORT_POSTS)) {
+      this.memWrite(STORAGE_KEYS.REPORT_POSTS, JSON.stringify([]));
+    }
     if (!this.memRead(STORAGE_KEYS.AUDIT)) {
       this.memWrite(STORAGE_KEYS.AUDIT, JSON.stringify([]));
     }
@@ -772,6 +784,16 @@ class StorageService {
     this.writeArray(STORAGE_KEYS.TICKETS, list);
     this.logAudit('DELETE', 'IT Support Tickets', id, `Deleted ticket ${id}`);
     this.notify();
+  }
+
+  public mergeExternalHelpdesk(tickets: SupportTicket[], activities: DailyActivity[]) {
+    if (tickets.length) {
+      this.writeArray(STORAGE_KEYS.TICKETS, this.mergeById(tickets, this.getTickets()), { cloud: false });
+    }
+    if (activities.length) {
+      this.writeArray(STORAGE_KEYS.ACTIVITIES, this.mergeById(activities, this.getActivities()), { cloud: false });
+    }
+    if (tickets.length || activities.length) this.notify();
   }
 
   // --- SAP Issues CRUD ---
@@ -1162,6 +1184,88 @@ class StorageService {
     this.notify();
   }
 
+  public getReportPosts(): ReportPost[] {
+    return this.readArray<ReportPost>(STORAGE_KEYS.REPORT_POSTS);
+  }
+
+  public isPostedToReport(source: ReportPostSource, recordId: string, month: string) {
+    return this.getReportPosts().some(
+      (item) => item.source === source && item.recordId === recordId && item.month === month
+    );
+  }
+
+  public postToReport(source: ReportPostSource, recordId: string, month: string) {
+    if (this.isPostedToReport(source, recordId, month)) return;
+    const list = this.getReportPosts();
+    list.push({
+      id: `POST-${month}-${source}-${recordId}`,
+      month,
+      source,
+      recordId,
+      postedAt: nowIso()
+    });
+    this.writeArray(STORAGE_KEYS.REPORT_POSTS, list);
+    this.logAudit('UPDATE', 'Monthly Reports', recordId, `Posted ${source} ${recordId} to ${month} report`);
+    this.syncMonthlyReportFromPosts(month);
+    this.notify();
+  }
+
+  public unpostFromReport(source: ReportPostSource, recordId: string, month: string) {
+    const list = this.getReportPosts().filter(
+      (item) => !(item.source === source && item.recordId === recordId && item.month === month)
+    );
+    this.writeArray(STORAGE_KEYS.REPORT_POSTS, list);
+    this.syncMonthlyReportFromPosts(month);
+    this.notify();
+  }
+
+  public postManyToReport(source: ReportPostSource, recordIds: string[], month: string) {
+    const existing = new Set(
+      this.getReportPosts()
+        .filter((item) => item.month === month && item.source === source)
+        .map((item) => item.recordId)
+    );
+    const list = this.getReportPosts();
+    recordIds.forEach((recordId) => {
+      if (existing.has(recordId)) return;
+      list.push({
+        id: `POST-${month}-${source}-${recordId}`,
+        month,
+        source,
+        recordId,
+        postedAt: nowIso()
+      });
+    });
+    this.writeArray(STORAGE_KEYS.REPORT_POSTS, list);
+    this.syncMonthlyReportFromPosts(month);
+    this.notify();
+  }
+
+  public syncMonthlyReportFromPosts(yearMonth: string) {
+    const live = this.generateMonthlyAggregation(yearMonth);
+    const saved = this.getReports().find((item) => item.month === yearMonth);
+    const merged: MonthlyReportData = {
+      ...live,
+      selectedTemplateId: saved?.selectedTemplateId,
+      status: saved?.status || live.status,
+      version: saved?.version || live.version,
+      createdAt: saved?.createdAt || live.createdAt
+    };
+    const list = this.getReports();
+    const idx = list.findIndex((item) => item.month === yearMonth || item.id === live.id);
+    if (idx >= 0) list[idx] = { ...merged, updatedAt: nowIso() };
+    else list.unshift({ ...merged, createdAt: nowIso(), updatedAt: nowIso() });
+    this.writeArray(STORAGE_KEYS.REPORTS, list);
+  }
+
+  public postedRecordIds(source: ReportPostSource, month: string) {
+    return new Set(
+      this.getReportPosts()
+        .filter((item) => item.month === month && item.source === source)
+        .map((item) => item.recordId)
+    );
+  }
+
   public getDeliveryReport(yearMonth: string): MonthlyReportData {
     const live = this.generateMonthlyAggregation(yearMonth);
     const saved = this.getReports().find((item) => item.month === yearMonth);
@@ -1510,13 +1614,23 @@ class StorageService {
   // --- Monthly Aggregator ---
   public generateMonthlyAggregation(yearMonth: string): MonthlyReportData {
     const settings = this.getSettings();
-    const activities = this.getActivities().filter((a) => a.date && a.date.startsWith(yearMonth));
+    const postedActivities = this.postedRecordIds('activities', yearMonth);
+    const postedTickets = this.postedRecordIds('tickets', yearMonth);
+    const postedProjects = this.postedRecordIds('projects', yearMonth);
+    const postedKpis = this.postedRecordIds('kpis', yearMonth);
+    const postedTraining = this.postedRecordIds('training', yearMonth);
+    const postedSap = this.postedRecordIds('sap', yearMonth);
+    const activities = this.getActivities().filter(
+      (a) => inYearMonth(a.date, yearMonth) && postedActivities.has(a.id)
+    );
     const completedActivities = activities.filter((a) => a.status === 'Completed');
     const inProgressActivities = activities.filter((a) => a.status === 'In Progress');
     const pendingActivities = activities.filter((a) => a.status === 'Planned' || a.status === 'Blocked');
     const totalHours = activities.reduce((sum, a) => sum + (a.hoursSpent || 0), 0);
 
-    const tickets = this.getTickets().filter((t) => t.reportedAt && t.reportedAt.startsWith(yearMonth));
+    const tickets = this.getTickets().filter(
+      (t) => inYearMonth(t.reportedAt, yearMonth) && postedTickets.has(t.id)
+    );
     const closedTickets = tickets.filter((t) => t.status === 'Resolved' || t.status === 'Closed');
     const openedTickets = tickets.filter((t) => t.status === 'Open' || t.status === 'In Progress');
     const overdueTickets = tickets.filter((t) => t.slaBreached);
@@ -1538,29 +1652,25 @@ class StorageService {
     const avgResolutionHours = closedWithHours > 0 ? Number((totalResolutionHours / closedWithHours).toFixed(1)) : 0;
     const slaCompliancePercent = closedWithHours > 0 ? Number(((withinSlaCount / closedWithHours) * 100).toFixed(1)) : (closedTickets.length ? 100 : 0);
 
-    const sapIssues = this.getSapIssues().filter((s) => s.dateIdentified && s.dateIdentified.startsWith(yearMonth));
+    const sapIssues = this.getSapIssues().filter(
+      (s) => inYearMonth(s.dateIdentified, yearMonth) && postedSap.has(s.id)
+    );
     const sapResolved = sapIssues.filter((s) => s.status === 'Resolved' || s.status === 'Closed').length;
 
-    const monthStart = `${yearMonth}-01`;
-    const monthEnd = `${yearMonth}-31`;
-    const projects = this.getProjects().filter((project) => {
-      const start = project.startDate || '';
-      const end = project.targetCompletionDate || '';
-      if (!start && !end) return true;
-      const startsThisMonth = start.slice(0, 7) === yearMonth;
-      const endsThisMonth = end.slice(0, 7) === yearMonth;
-      const spansMonth = Boolean(start && start <= monthEnd && (!end || end >= monthStart));
-      return startsThisMonth || endsThisMonth || spansMonth;
-    });
+    const projects = this.getProjects().filter(
+      (project) => postedProjects.has(project.id) && projectSpansMonth(project, yearMonth)
+    );
     const activeProjects = projects.filter((p) => p.status === 'In Progress' || p.status === 'Planned' || p.status === 'Active');
     const completedMilestones = projects.reduce((acc, p) => acc + (p.milestones?.filter((m) => m.status === 'Completed').length || 0), 0);
 
-    const kpis = this.getKpis();
+    const kpis = this.getKpis().filter((item) => postedKpis.has(item.id));
     const totalWeight = kpis.reduce((acc, k) => acc + (k.weightPercent || 0), 0);
     const weightedSum = kpis.reduce((acc, k) => acc + ((k.achievementPercent || 0) * ((k.weightPercent || 0) / 100)), 0);
     const averageAchievement = kpis.length > 0 ? Number(weightedSum.toFixed(1)) : 0;
 
-    const training = this.getTraining().filter((tr) => tr.date && tr.date.startsWith(yearMonth));
+    const training = this.getTraining().filter(
+      (tr) => inYearMonth(tr.date, yearMonth) && postedTraining.has(tr.id)
+    );
     const totalParticipants = training.reduce((sum, tr) => sum + (tr.participantCount || 0), 0);
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -1581,7 +1691,7 @@ class StorageService {
       executiveSummary:
         activities.length > 0 || tickets.length > 0 || projects.length > 0
           ? `During ${monthName} ${year}, Daily Work recorded ${activities.length} item(s) (${completedActivities.length} completed, ${Number(totalHours.toFixed(1))} hours). Helpdesk recorded ${tickets.length} ticket(s) with ${closedTickets.length} resolved (${slaCompliancePercent}% SLA). Projects recorded ${projects.length} initiative(s) with ${completedMilestones} completed milestone(s).`
-          : `No Daily Work, Helpdesk tickets, or Projects were recorded for ${monthName} ${year} in the selected company.`,
+          : `No posted Daily Work, Helpdesk tickets, or Projects for ${monthName} ${year}. Post each source first so it appears in this report.`,
       includedSections: ['cover', 'executive_summary', 'kpis', 'activities', 'support_tickets', 'sap_systems', 'projects', 'training', 'achievements', 'challenges_recommendations', 'next_month_priorities', 'signoff'],
       kpisSummary: {
         totalWeight,

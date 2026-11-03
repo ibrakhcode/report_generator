@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   LifeBuoy,
   Plus,
-  Search,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -14,9 +13,10 @@ import {
   Eye,
   Trash2,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
-import { SupportTicket, TicketCategory, TicketStatus, PriorityLevel } from '../../types';
+import { DailyActivity, SupportTicket, TicketCategory, TicketStatus, PriorityLevel } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { TeachingEmpty } from '@/components/System/TeachingEmpty';
@@ -25,6 +25,20 @@ import { draftTicketWriteup } from '@/lib/writeAssist';
 import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 import { SuggestField } from '@/components/System/SuggestField';
 import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
+import { useAppSession } from '@/context/AppSessionContext';
+import {
+  FOCUS_TICKET_EVENT,
+  consumeTicketFocus,
+  isAssignedToIbrahim,
+  isClosedTicket,
+  isUnassignedTicket,
+  writeSeenAssignedIds
+} from '@/lib/assignedTickets';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { PostToReportButton } from '@/components/System/PostToReportButton';
+import { recordIdsForSource, ticketMonthRecap } from '@/lib/reportPosts';
+import { TableSelectFilter, TableTextFilter, tableIncludes } from '@/components/System/TableColumnFilter';
 
 interface TicketsViewProps {
   selectedMonth: string;
@@ -32,16 +46,87 @@ interface TicketsViewProps {
 
 export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   const [tickets, setTickets] = useState<SupportTicket[]>(() => storage.getTickets());
-  const [search, setSearch] = useState('');
+  const [idFilter, setIdFilter] = useState('');
+  const [titleFilter, setTitleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [slaFilter, setSlaFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTicket, setEditingTicket] = useState<SupportTicket | null>(null);
   const [viewingTicket, setViewingTicket] = useState<SupportTicket | null>(null);
   const autoSave = useAutoSaveEnabled();
+  const { workspaceRevision } = useAppSession();
+  const [syncing, setSyncing] = useState(false);
+  const [deskFilter, setDeskFilter] = useState<'assigned' | 'unassigned' | 'month'>('assigned');
+  const [laneFilter, setLaneFilter] = useState<'open' | 'closed' | 'all'>('open');
+  const [focusId, setFocusId] = useState<string | null>(null);
   const departments = storage.getDepartmentNames();
   const devices = storage.getDeviceNames();
   const defaultDepartment = departments[0] || '';
+
+  const syncAssignedTickets = useCallback(async (silent = false) => {
+    if (!silent) setSyncing(true);
+    try {
+      const response = await fetch('/api/rms/tickets/sync', { method: 'POST', credentials: 'include' });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        imported?: number;
+        tickets?: SupportTicket[];
+        activities?: DailyActivity[];
+      };
+      if (!response.ok || !payload.ok) {
+        if (!silent) notify.error('Ticket sync failed', payload.error || 'Could not pull assigned tickets.');
+        return;
+      }
+      storage.mergeExternalHelpdesk(payload.tickets || [], payload.activities || []);
+      setTickets(storage.getTickets());
+      if (!silent) {
+        const count = payload.imported || payload.tickets?.length || 0;
+        notify.success('Helpdesk synced', count ? `${count} assigned ticket(s) are in this workspace.` : 'No new assigned tickets.');
+      }
+    } catch (error) {
+      if (!silent) {
+        notify.error('Ticket sync failed', error instanceof Error ? error.message : 'Could not pull assigned tickets.');
+      }
+    } finally {
+      if (!silent) setSyncing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    setTickets(storage.getTickets());
+  }, [workspaceRevision, selectedMonth]);
+
+  useEffect(() => {
+    writeSeenAssignedIds(storage.getTickets().filter(isAssignedToIbrahim).map((ticket) => ticket.id));
+  }, [tickets]);
+
+  const applyTicketFocus = useCallback((id: string) => {
+    setFocusId(id);
+    setDeskFilter('assigned');
+    setLaneFilter('open');
+    setStatusFilter('All');
+    setIdFilter('');
+    setTitleFilter('');
+    setCategoryFilter('All');
+    setPriorityFilter('All');
+    setSlaFilter('All');
+    const found = storage.getTickets().find((ticket) => ticket.id === id) || null;
+    setViewingTicket(found);
+  }, []);
+
+  useEffect(() => {
+    const pending = consumeTicketFocus();
+    if (pending) applyTicketFocus(pending);
+    const onFocus = (event: Event) => {
+      const id = String((event as CustomEvent<{ id?: string }>).detail?.id || '');
+      if (id) applyTicketFocus(id);
+    };
+    window.addEventListener(FOCUS_TICKET_EVENT, onFocus);
+    return () => window.removeEventListener(FOCUS_TICKET_EVENT, onFocus);
+  }, [applyTicketFocus]);
 
   const reportedAtInSelectedMonth = () => {
     const now = new Date();
@@ -80,20 +165,59 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   ];
 
   const statuses: ('All' | TicketStatus)[] = ['All', 'Open', 'In Progress', 'Awaiting Vendor', 'Resolved', 'Closed'];
+  const priorities: ('All' | PriorityLevel)[] = ['All', 'Critical', 'High', 'Medium', 'Low'];
 
   const filtered = useMemo(() => {
     return tickets.filter((tck) => {
-      const matchMonth = tck.reportedAt.startsWith(selectedMonth);
-      const matchSearch =
-        tck.title.toLowerCase().includes(search.toLowerCase()) ||
-        tck.id.toLowerCase().includes(search.toLowerCase()) ||
-        tck.requesterName.toLowerCase().includes(search.toLowerCase()) ||
-        tck.applicationOrDevice.toLowerCase().includes(search.toLowerCase());
+      const matchMonth = Boolean(tck.reportedAt && tck.reportedAt.startsWith(selectedMonth));
+      const matchDesk =
+        deskFilter === 'assigned'
+          ? isAssignedToIbrahim(tck)
+          : deskFilter === 'unassigned'
+            ? isUnassignedTicket(tck)
+            : true;
+      const matchLane =
+        laneFilter === 'all' ? true : laneFilter === 'closed' ? isClosedTicket(tck) : !isClosedTicket(tck);
+      const matchId = tableIncludes(tck.id, idFilter);
+      const matchTitle = tableIncludes(
+        `${tck.title} ${tck.requesterName} ${tck.department} ${tck.applicationOrDevice}`,
+        titleFilter
+      );
       const matchStatus = statusFilter === 'All' || tck.status === statusFilter;
       const matchCategory = categoryFilter === 'All' || tck.category === categoryFilter;
-      return matchMonth && matchSearch && matchStatus && matchCategory;
+      const matchPriority = priorityFilter === 'All' || tck.priority === priorityFilter;
+      const matchSla =
+        slaFilter === 'All'
+          ? true
+          : slaFilter === 'Breached'
+            ? Boolean(tck.slaBreached)
+            : !tck.slaBreached;
+      return matchMonth && matchDesk && matchLane && matchId && matchTitle && matchStatus && matchCategory && matchPriority && matchSla;
     });
-  }, [tickets, selectedMonth, search, statusFilter, categoryFilter]);
+  }, [
+    tickets,
+    selectedMonth,
+    idFilter,
+    titleFilter,
+    statusFilter,
+    categoryFilter,
+    priorityFilter,
+    slaFilter,
+    deskFilter,
+    laneFilter
+  ]);
+
+  const listed = useMemo(() => {
+    if (!focusId) return filtered;
+    const first = filtered.filter((item) => item.id === focusId);
+    const rest = filtered.filter((item) => item.id !== focusId);
+    return [...first, ...rest];
+  }, [filtered, focusId]);
+
+  const paged = usePagedList(
+    listed,
+    `${deskFilter}-${laneFilter}-${idFilter}-${titleFilter}-${statusFilter}-${categoryFilter}-${priorityFilter}-${slaFilter}-${selectedMonth}-${focusId || ''}`
+  );
 
   const handleOpenCreate = () => {
     const nextId = `TCK-2026-${String(tickets.length + 1).padStart(3, '0')}`;
@@ -208,67 +332,156 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
     notify.success(editingTicket ? 'Ticket updated' : 'Ticket saved', 'The helpdesk record is in place.');
   };
 
+  const dash = useMemo(() => {
+    const monthTickets = tickets.filter((item) => item.reportedAt && item.reportedAt.startsWith(selectedMonth));
+    const assignedOpen = monthTickets.filter((item) => isAssignedToIbrahim(item) && !isClosedTicket(item)).length;
+    const unassignedOpen = monthTickets.filter((item) => isUnassignedTicket(item) && item.status === 'Open').length;
+    const openLane = monthTickets.filter((item) => !isClosedTicket(item)).length;
+    const closedLane = monthTickets.filter((item) => isClosedTicket(item)).length;
+    const sla = monthTickets.filter((item) => item.slaBreached && !isClosedTicket(item)).length;
+    return { assignedOpen, unassignedOpen, openLane, closedLane, sla, monthCount: monthTickets.length };
+  }, [tickets, selectedMonth]);
+  const recap = useMemo(() => ticketMonthRecap(selectedMonth), [selectedMonth, tickets, workspaceRevision]);
+
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>IT Support Service Desk</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-emerald-400 font-mono border border-slate-700">
-              {filtered.length} tickets for {selectedMonth}
+              {filtered.length}{' '}
+              {deskFilter === 'assigned'
+                ? 'assigned to Ibrahim Msambwe'
+                : deskFilter === 'unassigned'
+                  ? 'unassigned'
+                  : `tickets for ${selectedMonth}`}
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Log user support incidents, track SLA resolution targets (8.0h threshold), and record root cause analysis.
+            Assigned tickets, unassigned Help Desk queue, and this month&apos;s records. Email Agent still records pasted mail.
           </p>
         </div>
 
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void syncAssignedTickets(false)}
+            disabled={syncing}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-xl text-xs font-bold text-white transition-colors flex items-center gap-1.5 disabled:opacity-60"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            <span>{syncing ? 'Syncing helpdesk' : 'Sync helpdesk'}</span>
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-emerald-600/20 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Support Ticket</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              storage.postManyToReport('tickets', recordIdsForSource('tickets', selectedMonth), selectedMonth);
+              notify.success('Posted to report', `Tickets for ${selectedMonth} are now in the monthly report.`);
+            }}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-teal-600/40 rounded-xl text-xs font-bold text-teal-300"
+          >
+            Post this month
+          </button>
+        </div>
+      </div>
+
+      <div className="shrink-0 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+        {[
+          { label: 'Assigned open', value: dash.assignedOpen, run: () => { setDeskFilter('assigned'); setLaneFilter('open'); } },
+          { label: 'Unassigned open', value: dash.unassignedOpen, run: () => { setDeskFilter('unassigned'); setLaneFilter('open'); } },
+          { label: 'Open / in progress', value: dash.openLane, run: () => { setDeskFilter('month'); setLaneFilter('open'); } },
+          { label: 'Closed', value: dash.closedLane, run: () => { setDeskFilter('month'); setLaneFilter('closed'); } },
+          { label: 'SLA breached', value: dash.sla, run: () => { setDeskFilter('assigned'); setLaneFilter('open'); setSlaFilter('Breached'); } },
+          { label: 'This month', value: dash.monthCount, run: () => { setDeskFilter('month'); setLaneFilter('all'); } }
+        ].map((card) => (
+          <button
+            key={card.label}
+            type="button"
+            onClick={card.run}
+            className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-left hover:border-teal-500/50"
+          >
+            <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{card.label}</p>
+            <p className="text-xl font-black text-white font-mono mt-1">{card.value}</p>
+          </button>
+        ))}
+      </div>
+
+      <div className="shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">What happened this month</p>
+        <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">{recap.narrative}</p>
+      </div>
+
+      <div className="shrink-0 flex flex-wrap gap-2">
         <button
-          onClick={handleOpenCreate}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-emerald-600/20 flex items-center gap-1.5"
+          type="button"
+          onClick={() => setDeskFilter('assigned')}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+            deskFilter === 'assigned' ? 'bg-teal-600 text-white border-teal-500' : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}
         >
-          <Plus className="w-4 h-4" />
-          <span>New Support Ticket</span>
+          Assigned to Ibrahim Msambwe
+        </button>
+        <button
+          type="button"
+          onClick={() => setDeskFilter('unassigned')}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+            deskFilter === 'unassigned' ? 'bg-teal-600 text-white border-teal-500' : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}
+        >
+          Unassigned
+        </button>
+        <button
+          type="button"
+          onClick={() => setDeskFilter('month')}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+            deskFilter === 'month' ? 'bg-teal-600 text-white border-teal-500' : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}
+        >
+          This month
+        </button>
+        <button
+          type="button"
+          onClick={() => setLaneFilter('open')}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+            laneFilter === 'open' ? 'bg-amber-500/20 text-amber-200 border-amber-500/40' : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}
+        >
+          Open
+        </button>
+        <button
+          type="button"
+          onClick={() => setLaneFilter('closed')}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+            laneFilter === 'closed' ? 'bg-slate-600 text-white border-slate-500' : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}
+        >
+          Closed
+        </button>
+        <button
+          type="button"
+          onClick={() => setLaneFilter('all')}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold border ${
+            laneFilter === 'all' ? 'bg-slate-600 text-white border-slate-500' : 'bg-slate-800 text-slate-300 border-slate-700'
+          }`}
+        >
+          All states
         </button>
       </div>
 
-      {/* Filter row */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search ticket ID, title, requester or device..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <SuggestField
-            className="w-40"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            placeholder="Status"
-            options={statuses.map((s) => ({ value: s, label: s }))}
-          />
-          <SuggestField
-            className="w-40"
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            placeholder="Category"
-            options={categories.map((c) => ({ value: c, label: c }))}
-          />
-        </div>
-      </div>
-
       {/* Tickets List */}
-      <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-700 uppercase tracking-wider text-[10px] font-semibold">
+      <div className="flex-1 min-h-[240px] bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <thead className="sticky top-0 z-20 bg-slate-900 [&_th]:bg-slate-900 text-slate-400 border-b border-slate-700 uppercase tracking-wider text-[10px] font-semibold">
               <tr>
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-4">Issue Title & Requester</th>
@@ -277,6 +490,27 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                 <th className="py-3 px-4 text-center">SLA Time</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={idFilter} onChange={setIdFilter} placeholder="ID" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={titleFilter} onChange={setTitleFilter} placeholder="Title or requester" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={categoryFilter} onChange={setCategoryFilter} options={categories} />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={priorityFilter} onChange={setPriorityFilter} options={priorities} />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={slaFilter} onChange={setSlaFilter} options={['All', 'On SLA', 'Breached']} />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={statusFilter} onChange={setStatusFilter} options={statuses} />
+                </th>
+                <th className="py-2 px-4" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/60 text-slate-300">
@@ -292,8 +526,15 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                   </td>
                 </tr>
               ) : (
-                filtered.map((tck) => (
-                  <tr key={tck.id} className="hover:bg-slate-700/30 transition-colors">
+                paged.pageItems.map((tck) => (
+                  <tr
+                    key={tck.id}
+                    className={
+                      tck.id === focusId
+                        ? 'bg-teal-500/15 ring-1 ring-inset ring-teal-500/40'
+                        : 'hover:bg-slate-700/30 transition-colors'
+                    }
+                  >
                     <td className="py-3 px-4 font-mono text-blue-400 font-semibold whitespace-nowrap">
                       {tck.id}
                     </td>
@@ -341,6 +582,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
+                        <PostToReportButton source="tickets" recordId={tck.id} />
                         <button
                           onClick={() => setViewingTicket(tck)}
                           className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
@@ -370,6 +612,13 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
             </tbody>
           </table>
         </div>
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
       </div>
 
       {/* Ticket Modal */}

@@ -3,8 +3,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import {
   Plus,
-  Search,
-  Filter,
   Calendar,
   Clock,
   CheckCircle,
@@ -28,6 +26,11 @@ import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 import { SuggestField } from '@/components/System/SuggestField';
 import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
 import { useAppSession } from '@/context/AppSessionContext';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { PostToReportButton } from '@/components/System/PostToReportButton';
+import { TableSelectFilter, TableTextFilter, tableIncludes } from '@/components/System/TableColumnFilter';
+import { recordIdsForSource } from '@/lib/reportPosts';
 
 interface ActivitiesViewProps {
   selectedMonth: string;
@@ -35,8 +38,11 @@ interface ActivitiesViewProps {
 
 export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth }) => {
   const [activities, setActivities] = useState<DailyActivity[]>(() => storage.getActivities());
-  const [search, setSearch] = useState('');
+  const [idFilter, setIdFilter] = useState('');
+  const [titleFilter, setTitleFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [deviceFilter, setDeviceFilter] = useState('');
+  const [hoursFilter, setHoursFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<DailyActivity | null>(null);
@@ -94,15 +100,20 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   const filtered = useMemo(() => {
     return activities.filter((act) => {
       const matchMonth = act.date.startsWith(selectedMonth);
-      const matchSearch =
-        act.title.toLowerCase().includes(search.toLowerCase()) ||
-        act.description.toLowerCase().includes(search.toLowerCase()) ||
-        act.systemOrDevice.toLowerCase().includes(search.toLowerCase());
+      const matchId = tableIncludes(`${act.id} ${act.date}`, idFilter);
+      const matchTitle = tableIncludes(`${act.title} ${act.actionTaken || ''} ${act.description}`, titleFilter);
       const matchCategory = categoryFilter === 'All' || act.category === categoryFilter;
+      const matchDevice = tableIncludes(`${act.systemOrDevice} ${act.department}`, deviceFilter);
+      const matchHours = tableIncludes(String(act.hoursSpent ?? ''), hoursFilter);
       const matchStatus = statusFilter === 'All' || act.status === statusFilter;
-      return matchMonth && matchSearch && matchCategory && matchStatus;
+      return matchMonth && matchId && matchTitle && matchCategory && matchDevice && matchHours && matchStatus;
     });
-  }, [activities, selectedMonth, search, categoryFilter, statusFilter]);
+  }, [activities, selectedMonth, idFilter, titleFilter, categoryFilter, deviceFilter, hoursFilter, statusFilter]);
+
+  const paged = usePagedList(
+    filtered,
+    `${selectedMonth}-${idFilter}-${titleFilter}-${categoryFilter}-${deviceFilter}-${hoursFilter}-${statusFilter}`
+  );
 
   const handleOpenCreate = () => {
     const nextId = `ACT-2026-${String(activities.length + 1).padStart(3, '0')}`;
@@ -232,7 +243,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Header bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -255,45 +266,24 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
             <Plus className="w-4 h-4" />
             <span>Record Activity</span>
           </button>
-        </div>
-      </div>
-
-      {/* Filters row */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search activity title, system, or action taken..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <SuggestField
-            className="w-40"
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-            placeholder="Category"
-            options={categories.map((c) => ({ value: c, label: c }))}
-          />
-          <SuggestField
-            className="w-40"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            placeholder="Status"
-            options={statuses.map((s) => ({ value: s, label: s }))}
-          />
+          <button
+            type="button"
+            onClick={() => {
+              storage.postManyToReport('activities', recordIdsForSource('activities', selectedMonth), selectedMonth);
+              notify.success('Posted to report', `Daily work for ${selectedMonth} is in the monthly report.`);
+            }}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-teal-600/40 rounded-xl text-xs font-bold text-teal-300"
+          >
+            Post this month
+          </button>
         </div>
       </div>
 
       {/* Activities Table */}
-      <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/80 text-slate-400 border-b border-slate-700 uppercase tracking-wider text-[10px] font-semibold">
+      <div className="flex-1 min-h-0 bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <thead className="sticky top-0 z-20 bg-slate-900 [&_th]:bg-slate-900 text-slate-400 border-b border-slate-700 uppercase tracking-wider text-[10px] font-semibold">
               <tr>
                 <th className="py-3 px-4">ID & Date</th>
                 <th className="py-3 px-4">Activity Title & Action</th>
@@ -302,6 +292,27 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                 <th className="py-3 px-4 text-center">Hours</th>
                 <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-right">Actions</th>
+              </tr>
+              <tr className="border-b border-slate-700">
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={idFilter} onChange={setIdFilter} placeholder="ID or date" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={titleFilter} onChange={setTitleFilter} placeholder="Title or action" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={categoryFilter} onChange={setCategoryFilter} options={categories} />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={deviceFilter} onChange={setDeviceFilter} placeholder="System or dept" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={hoursFilter} onChange={setHoursFilter} placeholder="Hours" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={statusFilter} onChange={setStatusFilter} options={statuses} />
+                </th>
+                <th className="py-2 px-4" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/60 text-slate-300">
@@ -317,7 +328,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                   </td>
                 </tr>
               ) : (
-                filtered.map((act) => (
+                paged.pageItems.map((act) => (
                   <tr key={act.id} className="hover:bg-slate-700/30 transition-colors">
                     <td className="py-3 px-4 whitespace-nowrap">
                       <div className="font-mono text-blue-400 font-semibold">{act.id}</div>
@@ -352,6 +363,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
+                        <PostToReportButton source="activities" recordId={act.id} />
                         <button
                           onClick={() => setViewingItem(act)}
                           className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
@@ -381,6 +393,13 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
             </tbody>
           </table>
         </div>
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
       </div>
 
       {/* Create / Edit Modal */}

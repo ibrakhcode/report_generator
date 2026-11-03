@@ -8,6 +8,8 @@ import { NavigationLoading } from '@/components/layout/NavigationLoading';
 import { storage } from '@/services/storage';
 import { allowedModuleIds, useAppSession } from '@/context/AppSessionContext';
 import { pathToModuleId } from '@/lib/moduleRoutes';
+import { AssignedTicketWatcher } from '@/components/System/AssignedTicketWatcher';
+import { ReportPostReminder } from '@/components/System/ReportPostReminder';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -65,6 +67,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="h-dvh w-full bg-slate-950 text-slate-100 flex flex-col overflow-hidden antialiased selection:bg-blue-600 selection:text-white">
+      <AssignedTicketWatcher />
+      <ReportPostReminder />
       <TopNavBar
         activeModuleId={activeModuleId}
         onSelectModule={selectModule}
@@ -94,9 +98,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         )}
         <main
           key={activeCompanyId}
-          className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4"
+          className="flex-1 min-h-0 w-full overflow-hidden px-3 sm:px-6 lg:px-8 py-3 sm:py-4 flex flex-col"
         >
-          {children}
+          <div className="h-full min-h-0 overflow-hidden">{children}</div>
         </main>
       </div>
 

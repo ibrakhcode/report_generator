@@ -18,7 +18,8 @@ const COLLECTIONS: RmsCollection[] = [
   'users',
   'audit',
   'assetDefinitions',
-  'assetRecords'
+  'assetRecords',
+  'reportPosts'
 ];
 
 export async function GET() {

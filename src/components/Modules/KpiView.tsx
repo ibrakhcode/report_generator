@@ -34,6 +34,11 @@ import { KpiItem, KpiCalculationType } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { PostToReportButton } from '@/components/System/PostToReportButton';
+import { useAppSession } from '@/context/AppSessionContext';
+import { recordIdsForSource } from '@/lib/reportPosts';
 
 // Month-over-Month historical performance trend data
 const MOM_KPI_TREND_DATA = [
@@ -80,7 +85,9 @@ const MOM_KPI_TREND_DATA = [
 ];
 
 export const KpiView: React.FC = () => {
+  const { selectedMonth } = useAppSession();
   const [kpis, setKpis] = useState<KpiItem[]>(() => storage.getKpis());
+  const paged = usePagedList(kpis);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState<KpiItem | null>(null);
   const [selectedTrendView, setSelectedTrendView] = useState<'composite' | 'uptime' | 'sla' | 'endpoint' | 'variance'>('composite');
@@ -192,7 +199,7 @@ export const KpiView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -213,13 +220,25 @@ export const KpiView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add Strategic KPI</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              storage.postManyToReport('kpis', recordIdsForSource('kpis', selectedMonth), selectedMonth);
+              notify.success('Posted to report', `KPIs are in the ${selectedMonth} report.`);
+            }}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-teal-600/40 rounded-xl text-xs font-bold text-teal-300"
+          >
+            Post this month
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add Strategic KPI</span>
+          </button>
+        </div>
       </div>
 
       {/* --- RECHARTS MONTH-OVER-MONTH PERFORMANCE VISUALIZATION --- */}
@@ -392,8 +411,8 @@ export const KpiView: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {kpis.map((kpi) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-auto content-start">
+          {paged.pageItems.map((kpi) => (
             <div
               key={kpi.id}
               className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 space-y-3 relative group hover:border-slate-600 transition-colors shadow-lg"
@@ -410,6 +429,7 @@ export const KpiView: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1">
+                  <PostToReportButton source="kpis" recordId={kpi.id} />
                   <button
                     onClick={() => handleOpenEdit(kpi)}
                     className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
@@ -472,6 +492,15 @@ export const KpiView: React.FC = () => {
           ))}
         </div>
       )}
+      {kpis.length > 0 ? (
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
+      ) : null}
 
       {/* KPI Edit Modal */}
       {isModalOpen && (

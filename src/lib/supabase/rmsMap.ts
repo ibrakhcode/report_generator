@@ -9,6 +9,7 @@ import type {
   KpiItem,
   MonthlyReportData,
   ProjectImprovement,
+  ReportPost,
   ReportTemplate,
   SupportTicket,
   TrainingRecord,
@@ -29,7 +30,8 @@ export type RmsCollection =
   | 'users'
   | 'audit'
   | 'assetDefinitions'
-  | 'assetRecords';
+  | 'assetRecords'
+  | 'reportPosts';
 
 const emptyArr = () => [] as string[];
 
@@ -157,6 +159,32 @@ export function ticketToRow(item: SupportTicket, userId: string, companyId: stri
     escalation_notes: item.escalationNotes || '',
     created_at: item.createdAt,
     updated_at: item.updatedAt
+  };
+}
+
+export function reportPostToRow(
+  item: ReportPost,
+  userId: string,
+  companyId: string | null
+) {
+  return {
+    id: item.id,
+    owner_user_id: userId,
+    company_id: companyId,
+    month: item.month,
+    source: item.source,
+    record_id: item.recordId,
+    posted_at: item.postedAt
+  };
+}
+
+export function rowToReportPost(row: Record<string, unknown>): ReportPost {
+  return {
+    id: text(row.id),
+    month: text(row.month),
+    source: (row.source as ReportPost['source']) || 'tickets',
+    recordId: text(row.record_id),
+    postedAt: text(row.posted_at)
   };
 }
 

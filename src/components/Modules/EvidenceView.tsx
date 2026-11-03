@@ -1,13 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FolderGit2, Upload, File, Download, Trash2, Search, Filter, Paperclip, X } from 'lucide-react';
 import { EvidenceFile } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { useAppSession } from '@/context/AppSessionContext';
+import { inYearMonth } from '@/lib/selectedMonth';
 
 export const EvidenceView: React.FC = () => {
+  const { selectedMonth } = useAppSession();
   const [evidenceList, setEvidenceList] = useState<EvidenceFile[]>(() => storage.getEvidence());
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -19,7 +24,7 @@ export const EvidenceView: React.FC = () => {
     description: '',
     relatedEntityId: 'KPI-01',
     relatedEntityType: 'KPI',
-    reportingPeriod: '2026-10'
+    reportingPeriod: selectedMonth
   });
 
   const categories = [
@@ -33,14 +38,20 @@ export const EvidenceView: React.FC = () => {
     'Certificate'
   ];
 
-  const filtered = evidenceList.filter((f) => {
-    const matchesSearch =
-      f.fileName.toLowerCase().includes(search.toLowerCase()) ||
-      f.description.toLowerCase().includes(search.toLowerCase()) ||
-      (f.relatedEntityId && f.relatedEntityId.toLowerCase().includes(search.toLowerCase()));
-    const matchesCategory = categoryFilter === 'All' || f.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+  const filtered = useMemo(
+    () =>
+      evidenceList.filter((f) => {
+        const matchesMonth = inYearMonth(f.reportingPeriod, selectedMonth) || f.reportingPeriod === selectedMonth;
+        const matchesSearch =
+          f.fileName.toLowerCase().includes(search.toLowerCase()) ||
+          f.description.toLowerCase().includes(search.toLowerCase()) ||
+          (f.relatedEntityId && f.relatedEntityId.toLowerCase().includes(search.toLowerCase()));
+        const matchesCategory = categoryFilter === 'All' || f.category === categoryFilter;
+        return matchesMonth && matchesSearch && matchesCategory;
+      }),
+    [evidenceList, selectedMonth, search, categoryFilter]
+  );
+  const paged = usePagedList(filtered, `${selectedMonth}-${search}-${categoryFilter}`);
 
   const handleUploadSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +64,7 @@ export const EvidenceView: React.FC = () => {
       fileType: formData.fileName.endsWith('.pdf') ? 'application/pdf' : 'image/png',
       uploadDate: new Date().toISOString(),
       uploadedBy: 'Imani Sambwe',
-      reportingPeriod: formData.reportingPeriod || '2026-10',
+      reportingPeriod: formData.reportingPeriod || selectedMonth,
       category: (formData.category as EvidenceFile['category']) || 'System Log',
       description: formData.description || '',
       relatedEntityId: formData.relatedEntityId,
@@ -75,13 +86,13 @@ export const EvidenceView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>Evidence & Verification Library</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-sky-400 font-mono border border-slate-700">
-              {filtered.length} files archived
+              {filtered.length} files for {selectedMonth}
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
@@ -137,8 +148,8 @@ export const EvidenceView: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((ev) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 flex-1 min-h-0 overflow-auto content-start">
+          {paged.pageItems.map((ev) => (
             <div
               key={ev.id}
               className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 space-y-3 relative group hover:border-slate-600 transition-colors"
@@ -174,6 +185,15 @@ export const EvidenceView: React.FC = () => {
           ))}
         </div>
       )}
+      {filtered.length > 0 ? (
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
+      ) : null}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">

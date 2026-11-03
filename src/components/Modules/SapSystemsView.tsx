@@ -1,21 +1,33 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Cpu, Plus, AlertCircle, CheckCircle2, ShieldCheck, X } from 'lucide-react';
 import { BusinessSystemIssue } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { PostToReportButton } from '@/components/System/PostToReportButton';
+import { useAppSession } from '@/context/AppSessionContext';
+import { recordIdsForSource } from '@/lib/reportPosts';
+import { defaultDateForMonth, inYearMonth } from '@/lib/selectedMonth';
 
 export const SapSystemsView: React.FC = () => {
+  const { selectedMonth } = useAppSession();
   const [issues, setIssues] = useState<BusinessSystemIssue[]>(() => storage.getSapIssues());
+  const monthIssues = useMemo(
+    () => issues.filter((item) => inYearMonth(item.dateIdentified, selectedMonth)),
+    [issues, selectedMonth]
+  );
+  const paged = usePagedList(monthIssues, selectedMonth);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [formData, setFormData] = useState<Partial<BusinessSystemIssue>>({
     systemName: 'SAP Business One',
     module: 'Sales & Invoicing',
     errorCode: '',
-    dateIdentified: new Date().toISOString().split('T')[0],
+    dateIdentified: defaultDateForMonth(selectedMonth),
     affectedBusinessUnit: 'Finance',
     businessImpact: '',
     investigation: '',
@@ -53,13 +65,13 @@ export const SapSystemsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>SAP Business One & Enterprise Systems</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-blue-400 font-mono border border-slate-700">
-              {issues.length} incidents logged
+              {monthIssues.length} incidents for {selectedMonth}
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
@@ -67,34 +79,46 @@ export const SapSystemsView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setFormData({
-              systemName: 'SAP Business One',
-              module: 'Sales & Invoicing',
-              dateIdentified: new Date().toISOString().split('T')[0],
-              affectedBusinessUnit: 'Finance',
-              businessImpact: '',
-              investigation: '',
-              correctiveAction: '',
-              status: 'Investigating',
-              evidenceFiles: []
-            });
-            setIsModalOpen(true);
-          }}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Log System Issue</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              storage.postManyToReport('sap', recordIdsForSource('sap', selectedMonth), selectedMonth);
+              notify.success('Posted to report', `SAP issues are in the ${selectedMonth} report.`);
+            }}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-teal-600/40 rounded-xl text-xs font-bold text-teal-300"
+          >
+            Post this month
+          </button>
+          <button
+            onClick={() => {
+              setFormData({
+                systemName: 'SAP Business One',
+                module: 'Sales & Invoicing',
+                dateIdentified: defaultDateForMonth(selectedMonth),
+                affectedBusinessUnit: 'Finance',
+                businessImpact: '',
+                investigation: '',
+                correctiveAction: '',
+                status: 'Investigating',
+                evidenceFiles: []
+              });
+              setIsModalOpen(true);
+            }}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Log System Issue</span>
+          </button>
+        </div>
       </div>
 
-      {issues.length === 0 ? (
+      {monthIssues.length === 0 ? (
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto text-xl">
             💻
           </div>
-          <h3 className="text-base font-bold text-white">No Business System Issues Logged</h3>
+          <h3 className="text-base font-bold text-white">No system issues for {selectedMonth}</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
             Track root causes, workarounds, and vendor escalations for SAP Business One, VNV integration, or ERP modules.
           </p>
@@ -107,8 +131,8 @@ export const SapSystemsView: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {issues.map((item) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-auto content-start">
+        {paged.pageItems.map((item) => (
           <div
             key={item.id}
             className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 space-y-3"
@@ -146,6 +170,7 @@ export const SapSystemsView: React.FC = () => {
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-700/60">
+              <PostToReportButton source="sap" recordId={item.id} />
               <span>Vendor: {item.vendorInvolved || 'Internal IT'}</span>
               <span>Identified: {item.dateIdentified}</span>
             </div>
@@ -153,6 +178,15 @@ export const SapSystemsView: React.FC = () => {
         ))}
         </div>
       )}
+      {monthIssues.length > 0 ? (
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
+      ) : null}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">

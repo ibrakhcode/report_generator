@@ -38,7 +38,7 @@ export const BackupRestoreView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 overflow-y-auto space-y-6">
       <div>
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <span>Database Backup, Disaster Recovery & Restore</span>

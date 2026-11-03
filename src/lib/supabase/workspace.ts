@@ -11,6 +11,7 @@ import {
   kpiToRow,
   parseDataUrl,
   projectToRow,
+  reportPostToRow,
   reportToRow,
   rowToActivity,
   rowToAssetRecord,
@@ -21,6 +22,7 @@ import {
   rowToKpi,
   rowToProject,
   rowToReport,
+  rowToReportPost,
   rowToSettings,
   rowToTemplate,
   rowToTicket,
@@ -83,7 +85,9 @@ async function replaceOwnerRows(
   const existing = await supabase.from(table).select('id').eq('owner_user_id', userId);
   if (existing.error) throw new Error(existing.error.message);
   const keep = new Set(rows.map((row) => String(row.id)));
-  const extra = (existing.data || []).map((row) => String(row.id)).filter((id) => !keep.has(id));
+  const extra = (existing.data || [])
+    .map((row) => String(row.id))
+    .filter((id) => !keep.has(id) && !id.startsWith('TCK-EXT-') && !id.startsWith('ACT-EXT-'));
   if (!extra.length) return;
   const del = await supabase.from(table).delete().in('id', extra);
   if (del.error) throw new Error(del.error.message);
@@ -147,7 +151,8 @@ export async function readWorkspace(supabase: SupabaseClient, session: RmsSessio
     audit,
     definitions,
     records,
-    settings
+    settings,
+    reportPosts
   ] = await Promise.all([
     supabase.from('daily_activities').select('*').eq('owner_user_id', owner),
     supabase.from('tickets').select('*').eq('owner_user_id', owner),
@@ -172,7 +177,8 @@ export async function readWorkspace(supabase: SupabaseClient, session: RmsSessio
       : supabase.from('asset_records').select('*').eq('owner_user_id', owner),
     companyId
       ? supabase.from('company_settings').select('*').eq('company_id', companyId).maybeSingle()
-      : Promise.resolve({ data: null, error: null })
+      : Promise.resolve({ data: null, error: null }),
+    supabase.from('report_posts').select('*').eq('owner_user_id', owner)
   ]);
 
   const firstError = [
@@ -192,6 +198,10 @@ export async function readWorkspace(supabase: SupabaseClient, session: RmsSessio
     settings
   ].find((result) => result.error);
   if (firstError?.error) throw new Error(firstError.error.message);
+  const postsMissing =
+    Boolean(reportPosts.error) &&
+    /report_posts|PGRST205|42P01|schema cache/i.test(`${reportPosts.error?.message || ''} ${reportPosts.error?.code || ''}`);
+  if (reportPosts.error && !postsMissing) throw new Error(reportPosts.error.message);
 
   const mappedTraining = (training.data || []).map((row) => rowToTraining(row as Record<string, unknown>));
   const mappedEvidence = (evidence.data || []).map((row) => rowToEvidence(row as Record<string, unknown>));
@@ -219,7 +229,8 @@ export async function readWorkspace(supabase: SupabaseClient, session: RmsSessio
     assetRecords: (records.data || []).map((row) => rowToAssetRecord(row as Record<string, unknown>)),
     settings: settings.data
       ? rowToSettings(settings.data as Record<string, unknown>, SETTINGS_FALLBACK)
-      : null
+      : null,
+    reportPosts: postsMissing ? [] : (reportPosts.data || []).map((row) => rowToReportPost(row as Record<string, unknown>))
   };
 }
 
@@ -363,6 +374,15 @@ export async function writeCollection(
       rows.push(trainingToRow(item, owner, companyId, path));
     }
     await replaceOwnerRows(supabase, 'training', owner, rows);
+    return;
+  }
+
+  if (collection === 'reportPosts') {
+    const list = Array.isArray(items) ? items : [];
+    const rows = list.map((item) =>
+      reportPostToRow(item as Parameters<typeof reportPostToRow>[0], owner, companyId)
+    );
+    await replaceOwnerRows(supabase, 'report_posts', owner, rows);
     return;
   }
 

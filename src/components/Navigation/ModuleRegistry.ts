@@ -35,9 +35,9 @@ export const APP_MODULES: AppModule[] = [
   {
     id: 'tickets',
     name: 'IT Support Tickets',
-    shortName: 'Helpdesk',
+    shortName: 'Assigned to Ibrahim',
     category: 'Operations',
-    description: 'Track incident requests, hardware failures, and SLA resolution times',
+    description: 'Open and closed tickets assigned to Ibrahim Msambwe, plus local helpdesk records',
     iconName: 'LifeBuoy',
     badge: 'SLA 8h',
     gradient: 'from-emerald-400 via-teal-500 to-cyan-600',

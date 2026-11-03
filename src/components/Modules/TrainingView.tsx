@@ -1,20 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { BookOpen, Plus, Users, Star, Calendar, FileText, X, Eye, Edit2 } from 'lucide-react';
 import { TrainingRecord } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { PostToReportButton } from '@/components/System/PostToReportButton';
+import { useAppSession } from '@/context/AppSessionContext';
+import { recordIdsForSource } from '@/lib/reportPosts';
+import { defaultDateForMonth, inYearMonth } from '@/lib/selectedMonth';
 
 export const TrainingView: React.FC = () => {
+  const { selectedMonth } = useAppSession();
   const [trainings, setTrainings] = useState<TrainingRecord[]>(() => storage.getTraining());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState<TrainingRecord | null>(null);
 
   const emptyTraining = (): Partial<TrainingRecord> => ({
     title: '',
-    date: new Date().toISOString().split('T')[0],
+    date: defaultDateForMonth(selectedMonth),
     topic: '',
     targetAudience: '',
     participantCount: 15,
@@ -24,6 +31,11 @@ export const TrainingView: React.FC = () => {
     evidenceFiles: []
   });
   const [formData, setFormData] = useState<Partial<TrainingRecord>>(emptyTraining);
+  const monthTrainings = useMemo(
+    () => trainings.filter((item) => inYearMonth(item.date, selectedMonth)),
+    [trainings, selectedMonth]
+  );
+  const paged = usePagedList(monthTrainings, selectedMonth);
 
   const handleOpenCreate = () => {
     setFormData(emptyTraining());
@@ -72,13 +84,13 @@ export const TrainingView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>Staff Training & Knowledge Sharing</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-purple-400 font-mono border border-slate-700">
-              {trainings.length} sessions delivered
+              {monthTrainings.length} sessions for {selectedMonth}
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
@@ -86,21 +98,33 @@ export const TrainingView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-purple-600/20 flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Record Training Session</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              storage.postManyToReport('training', recordIdsForSource('training', selectedMonth), selectedMonth);
+              notify.success('Posted to report', `Training is in the ${selectedMonth} report.`);
+            }}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-teal-600/40 rounded-xl text-xs font-bold text-teal-300"
+          >
+            Post this month
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-purple-600/20 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Record Training Session</span>
+          </button>
+        </div>
       </div>
 
-      {trainings.length === 0 ? (
+      {monthTrainings.length === 0 ? (
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto text-xl">
             🎓
           </div>
-          <h3 className="text-base font-bold text-white">No Training Sessions Recorded Yet</h3>
+          <h3 className="text-base font-bold text-white">No training sessions for {selectedMonth}</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
             Record cybersecurity awareness seminars, phishing defense drills, system workshops, and attendance sheets.
           </p>
@@ -113,8 +137,8 @@ export const TrainingView: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {trainings.map((tr) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-auto content-start">
+          {paged.pageItems.map((tr) => (
             <div
               key={tr.id}
               className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 space-y-3"
@@ -166,6 +190,7 @@ export const TrainingView: React.FC = () => {
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-700/60">
+                <PostToReportButton source="training" recordId={tr.id} />
                 <span>Date: {tr.date}</span>
                 {tr.signedDocumentDataUrl ? (
                   <a
@@ -183,6 +208,15 @@ export const TrainingView: React.FC = () => {
           ))}
         </div>
       )}
+      {monthTrainings.length > 0 ? (
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
+      ) : null}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden">

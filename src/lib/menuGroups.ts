@@ -50,7 +50,7 @@ export function modulesInGroup(groupId: string, allowedIds: string[]): AppModule
   return APP_MODULES.filter((item) => item.category === group.category && allowedIds.includes(item.id));
 }
 
-const STANDALONE_ORDER = ['users', 'email-agent', 'assets', 'settings', 'backup'];
+const STANDALONE_ORDER = ['email-agent', 'users', 'assets', 'settings', 'backup'];
 
 export function standaloneModules(allowedIds: string[]): AppModule[] {
   const groupedCategories = MENU_GROUPS.map((group) => group.category);

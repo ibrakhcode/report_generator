@@ -267,6 +267,16 @@ export interface MonthlyReportData {
   selectedTemplateId?: string;
 }
 
+export type ReportPostSource = 'tickets' | 'activities' | 'projects' | 'kpis' | 'training' | 'sap';
+
+export interface ReportPost {
+  id: string;
+  month: string;
+  source: ReportPostSource;
+  recordId: string;
+  postedAt: string;
+}
+
 export interface ReportTemplate {
   id: string;
   name: string;

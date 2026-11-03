@@ -16,6 +16,7 @@ import { resolveTemplate } from '@/lib/reportTheme';
 import { ReportDocumentPreview } from '@/components/Reports/ReportDocumentPreview';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
+import { monthLabel, sourcePostStatus } from '@/lib/reportPosts';
 
 interface MonthlyReportsViewProps {
   selectedMonth: string;
@@ -41,11 +42,16 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
   );
   const autoSave = useAutoSaveEnabled();
   const { workspaceRevision } = useAppSession();
+  const postStatus = sourcePostStatus(selectedMonth);
 
   useEffect(() => {
     const next = storage.getDeliveryReport(selectedMonth);
-    setReport(next);
-    if (next.selectedTemplateId) setSelectedTemplateId(next.selectedTemplateId);
+    const remembered =
+      (typeof window !== 'undefined' && sessionStorage.getItem('hesu_selected_template_id')) ||
+      next.selectedTemplateId ||
+      selectedTemplateId;
+    setReport({ ...next, selectedTemplateId: remembered || next.selectedTemplateId });
+    if (remembered) setSelectedTemplateId(remembered);
   }, [selectedMonth, workspaceRevision]);
 
   const persistReport = useCallback(() => {
@@ -76,7 +82,7 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 overflow-y-auto space-y-6">
       {/* Action Header Banner */}
       <div className="bg-gradient-to-r from-blue-900 via-slate-800 to-indigo-950 border border-blue-800/50 rounded-2xl p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-2xl">
         <div className="space-y-1.5 max-w-2xl">
@@ -92,7 +98,7 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
             {report.title}
           </h2>
           <p className="text-xs text-slate-300">
-            Design comes from the selected template. Numbers and tables come from Daily Work, Helpdesk, and Projects for {selectedMonth}.
+            Design comes from the selected template. Numbers and tables come only from records posted to {selectedMonth}.
           </p>
           <div className="pt-2">
             <SuggestField
@@ -127,6 +133,25 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
             <Share2 className="w-4 h-4" />
             <span>Open Delivery</span>
           </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 space-y-2">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
+          Posted sources for {monthLabel(selectedMonth)}
+        </p>
+        <p className="text-xs text-slate-400">
+          Only posted tickets, daily work, projects, KPIs, training, and SAP issues appear in this report.
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 pt-1">
+          {postStatus.map((item) => (
+            <div key={item.id} className="rounded-xl border border-slate-700 px-3 py-2">
+              <p className="text-[11px] text-slate-400">{item.label}</p>
+              <p className={`text-sm font-bold font-mono ${item.missing ? 'text-amber-300' : 'text-teal-300'}`}>
+                {item.posted}/{item.total} posted
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 

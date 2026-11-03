@@ -103,7 +103,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedMonth, onN
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-150">
+    <div className="h-full min-h-0 overflow-y-auto space-y-6 animate-in fade-in duration-150">
       {/* Top Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-[28px] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
         <div className="relative z-10 max-w-2xl space-y-2">

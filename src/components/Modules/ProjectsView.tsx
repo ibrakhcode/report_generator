@@ -1,14 +1,21 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Layers, Plus, CheckSquare, Clock, Calendar, CheckCircle2, ChevronRight, X, Eye } from 'lucide-react';
 import { ProjectImprovement, ProjectMilestone } from '../../types';
 import { storage } from '../../services/storage';
 import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
 import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { PostToReportButton } from '@/components/System/PostToReportButton';
+import { useAppSession } from '@/context/AppSessionContext';
+import { recordIdsForSource } from '@/lib/reportPosts';
+import { defaultDateForMonth, projectSpansMonth } from '@/lib/selectedMonth';
 
 export const ProjectsView: React.FC = () => {
+  const { selectedMonth } = useAppSession();
   const [projects, setProjects] = useState<ProjectImprovement[]>(() => storage.getProjects());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingProject, setViewingProject] = useState<ProjectImprovement | null>(null);
@@ -18,7 +25,7 @@ export const ProjectsView: React.FC = () => {
     name: '',
     objective: '',
     businessJustification: '',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: defaultDateForMonth(selectedMonth),
     targetCompletionDate: '2026-11-30',
     owner: users[0]?.fullName || '',
     assignedUserId: users[0]?.id || '',
@@ -36,6 +43,11 @@ export const ProjectsView: React.FC = () => {
     evidenceFiles: []
   });
   const [formData, setFormData] = useState<Partial<ProjectImprovement>>(emptyProject);
+  const monthProjects = useMemo(
+    () => projects.filter((item) => projectSpansMonth(item, selectedMonth)),
+    [projects, selectedMonth]
+  );
+  const paged = usePagedList(monthProjects, selectedMonth);
 
   const handleOpenCreate = () => {
     setFormData(emptyProject());
@@ -110,13 +122,13 @@ export const ProjectsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>Projects & Continuous Improvements</span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-teal-400 font-mono border border-slate-700">
-              {projects.length} strategic initiatives
+              {monthProjects.length} initiatives for {selectedMonth}
             </span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
@@ -124,21 +136,33 @@ export const ProjectsView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreate}
-          className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-teal-600/20 flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Project Initiative</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              storage.postManyToReport('projects', recordIdsForSource('projects', selectedMonth), selectedMonth);
+              notify.success('Posted to report', `Projects are in the ${selectedMonth} report.`);
+            }}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-teal-600/40 rounded-xl text-xs font-bold text-teal-300"
+          >
+            Post this month
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="px-4 py-2 bg-teal-600 hover:bg-teal-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-teal-600/20 flex items-center gap-1.5"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Project Initiative</span>
+          </button>
+        </div>
       </div>
 
-      {projects.length === 0 ? (
+      {monthProjects.length === 0 ? (
         <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 text-center space-y-3">
           <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto text-xl">
             🚀
           </div>
-          <h3 className="text-base font-bold text-white">No Project Initiatives Yet</h3>
+          <h3 className="text-base font-bold text-white">No projects for {selectedMonth}</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
             Record continuous improvements, IT infrastructure upgrades, disaster recovery tests, or ERP enhancements with weighted milestone tracking.
           </p>
@@ -151,8 +175,8 @@ export const ProjectsView: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {projects.map((proj) => (
+        <div className="space-y-4 flex-1 min-h-0 overflow-auto">
+          {paged.pageItems.map((proj) => (
           <div
             key={proj.id}
             className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4 shadow-lg"
@@ -229,6 +253,7 @@ export const ProjectsView: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-700/60 gap-2">
+              <PostToReportButton source="projects" recordId={proj.id} />
               <div>
                 Assigned to:{' '}
                 <span className="text-slate-200 font-medium">{proj.assignedUserName || proj.owner || 'Unassigned'}</span>
@@ -239,6 +264,15 @@ export const ProjectsView: React.FC = () => {
         ))}
         </div>
       )}
+      {monthProjects.length > 0 ? (
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
+      ) : null}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">

@@ -8,6 +8,8 @@ import { storage } from '../../services/storage';
 import { useAutoSaveEnabled } from '@/hooks/useAutoSave';
 import { useAppSession } from '@/context/AppSessionContext';
 import { SuggestField } from '@/components/System/SuggestField';
+import { TicketNoticePanel } from '@/components/System/TicketNoticePanel';
+import { monthPickerOptions } from '@/lib/selectedMonth';
 
 interface TopNavBarProps {
   activeModuleId: string;
@@ -47,14 +49,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
     window.setTimeout(() => setSavedFlash(false), 1500);
   };
 
-  const monthOptions = [
-    { value: '2026-10', label: 'October 2026' },
-    { value: '2026-09', label: 'September 2026' },
-    { value: '2026-08', label: 'August 2026' },
-    { value: '2026-07', label: 'July 2026' },
-    { value: '2026-11', label: 'November 2026' },
-    { value: '2026-12', label: 'December 2026' }
-  ];
+  const monthOptions = monthPickerOptions(selectedMonth);
 
   return (
     <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-slate-100 px-3 sm:px-5 min-h-12 py-1.5 flex items-center justify-between gap-2 shrink-0">
@@ -125,6 +120,7 @@ export const TopNavBar: React.FC<TopNavBarProps> = ({
           />
         </div>
 
+        <TicketNoticePanel onOpenTickets={() => onSelectModule('tickets')} />
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-full bg-teal-600 text-white text-xs font-bold flex items-center justify-center shrink-0">
             {currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : 'A'}

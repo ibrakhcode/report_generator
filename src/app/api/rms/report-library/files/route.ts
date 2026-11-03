@@ -18,6 +18,9 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const folderId = url.searchParams.get('folderId') || '';
   const q = (url.searchParams.get('q') || '').trim();
+  const type = (url.searchParams.get('type') || '').trim();
+  const size = (url.searchParams.get('size') || '').trim();
+  const uploaded = (url.searchParams.get('uploaded') || '').trim();
   const fileId = url.searchParams.get('id') || '';
   const supabase = getSupabaseServerClient();
 
@@ -41,10 +44,23 @@ export async function GET(request: Request) {
     .eq('owner_user_id', session.userId)
     .eq('folder_id', folderId)
     .order('uploaded_at', { ascending: false });
-  if (q) query = query.ilike('file_name', `%${q}%`);
+  if (q) query = query.or(`file_name.ilike.%${q}%,description.ilike.%${q}%`);
+  if (type) query = query.ilike('file_type', `%${type}%`);
   const { data, error } = await query;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, files: data || [] });
+  const needleSize = size.toLowerCase();
+  const needleUploaded = uploaded.toLowerCase();
+  const files = (data || []).filter((item) => {
+    const fileSize = Number(item.file_size || 0);
+    const sizeText = `${fileSize} ${(fileSize / 1024).toFixed(1)} kb`;
+    const uploadedText = item.uploaded_at
+      ? `${item.uploaded_at} ${new Date(String(item.uploaded_at)).toLocaleString()}`
+      : '';
+    const matchSize = !needleSize || sizeText.includes(needleSize);
+    const matchUploaded = !needleUploaded || uploadedText.toLowerCase().includes(needleUploaded);
+    return matchSize && matchUploaded;
+  });
+  return NextResponse.json({ ok: true, files });
 }
 
 export async function POST(request: Request) {

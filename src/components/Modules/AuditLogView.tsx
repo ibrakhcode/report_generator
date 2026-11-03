@@ -1,26 +1,32 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ShieldCheck, Search, Download, Filter, Calendar } from 'lucide-react';
+import { usePagedList } from '@/hooks/usePagedList';
+import { PageBar } from '@/components/System/PageBar';
+import { Download } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { AuditLogEntry } from '../../types';
-import { SuggestField } from '@/components/System/SuggestField';
+import { TableSelectFilter, TableTextFilter, tableIncludes } from '@/components/System/TableColumnFilter';
 
 export const AuditLogView: React.FC = () => {
   const [logs] = useState<AuditLogEntry[]>(() => storage.getAuditLogs());
-  const [search, setSearch] = useState('');
+  const [timeFilter, setTimeFilter] = useState('');
+  const [userFilter, setUserFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('All');
+  const [moduleFilter, setModuleFilter] = useState('');
+  const [detailsFilter, setDetailsFilter] = useState('');
 
   const actions = ['All', 'CREATE', 'UPDATE', 'DELETE', 'EXPORT_PPTX', 'EXPORT_PDF', 'EMAIL_SENT', 'WHATSAPP_SHARED', 'LOGIN', 'RESTORE_BACKUP'];
 
   const filtered = logs.filter((l) => {
-    const matchSearch =
-      l.details.toLowerCase().includes(search.toLowerCase()) ||
-      l.module.toLowerCase().includes(search.toLowerCase()) ||
-      l.userEmail.toLowerCase().includes(search.toLowerCase());
+    const matchTime = tableIncludes(new Date(l.timestamp).toLocaleString('en-GB'), timeFilter);
+    const matchUser = tableIncludes(`${l.userName} ${l.userEmail}`, userFilter);
     const matchAction = actionFilter === 'All' || l.action === actionFilter;
-    return matchSearch && matchAction;
+    const matchModule = tableIncludes(l.module, moduleFilter);
+    const matchDetails = tableIncludes(l.details, detailsFilter);
+    return matchTime && matchUser && matchAction && matchModule && matchDetails;
   });
+  const paged = usePagedList(filtered, `${timeFilter}-${userFilter}-${actionFilter}-${moduleFilter}-${detailsFilter}`);
 
   const handleExportLogs = () => {
     const csvContent =
@@ -43,7 +49,7 @@ export const AuditLogView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -66,31 +72,10 @@ export const AuditLogView: React.FC = () => {
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search action details, user email or module..."
-            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <SuggestField
-          className="w-44"
-          value={actionFilter}
-          onChange={setActionFilter}
-          placeholder="Action"
-          options={actions.map((a) => ({ value: a, label: a }))}
-        />
-      </div>
-
-      <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-900/80 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-700">
+      <div className="flex-1 min-h-0 bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <div className="flex-1 min-h-0 overflow-auto">
+          <table className="w-full text-left text-xs border-separate border-spacing-0">
+            <thead className="sticky top-0 z-20 bg-slate-900 [&_th]:bg-slate-900 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-700">
               <tr>
                 <th className="py-3 px-4">Timestamp (EAT)</th>
                 <th className="py-3 px-4">User</th>
@@ -98,9 +83,26 @@ export const AuditLogView: React.FC = () => {
                 <th className="py-3 px-4">Module</th>
                 <th className="py-3 px-4">Details</th>
               </tr>
+              <tr className="border-b border-slate-700">
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={timeFilter} onChange={setTimeFilter} placeholder="Date" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={userFilter} onChange={setUserFilter} placeholder="User" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableSelectFilter value={actionFilter} onChange={setActionFilter} options={actions} />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={moduleFilter} onChange={setModuleFilter} placeholder="Module" />
+                </th>
+                <th className="py-2 px-4 font-normal">
+                  <TableTextFilter value={detailsFilter} onChange={setDetailsFilter} placeholder="Details" />
+                </th>
+              </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/60 text-slate-300">
-              {filtered.map((log) => (
+              {paged.pageItems.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-700/30">
                   <td className="py-3 px-4 font-mono text-slate-400 whitespace-nowrap">
                     {new Date(log.timestamp).toLocaleString('en-GB')}
@@ -135,6 +137,13 @@ export const AuditLogView: React.FC = () => {
             </tbody>
           </table>
         </div>
+        <PageBar
+          total={paged.total}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          pageSize={paged.pageSize}
+          onPage={paged.setPage}
+        />
       </div>
     </div>
   );

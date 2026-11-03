@@ -172,7 +172,7 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="h-full min-h-0 overflow-y-auto space-y-6">
       <div>
         <h2 className="text-xl font-bold text-white">Report Delivery</h2>
         <p className="text-xs text-slate-400 mt-1">

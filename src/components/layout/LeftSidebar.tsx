@@ -5,6 +5,8 @@ import { ChevronDown, LogOut, X } from 'lucide-react';
 import { ModuleIcon } from '@/components/Navigation/ModuleIcon';
 import { allowedModuleIds, useAppSession } from '@/context/AppSessionContext';
 import { MENU_GROUPS, groupFromModuleId, modulesInGroup, standaloneModules } from '@/lib/menuGroups';
+import { storage } from '@/services/storage';
+import { TICKET_NOTICE_EVENT, notificationBadgeCount } from '@/lib/assignedTickets';
 
 export function LeftSidebar({
   className = '',
@@ -23,11 +25,23 @@ export function LeftSidebar({
   const allowed = allowedModuleIds(currentUser);
   const activeGroup = groupFromModuleId(activeModuleId);
   const [openGroups, setOpenGroups] = useState<string[]>(activeGroup ? [activeGroup.id] : ['operations']);
+  const [assignedAlertCount, setAssignedAlertCount] = useState(0);
 
   useEffect(() => {
     if (!activeGroup) return;
     setOpenGroups((current) => (current.includes(activeGroup.id) ? current : [...current, activeGroup.id]));
   }, [activeGroup]);
+
+  useEffect(() => {
+    const refresh = () => setAssignedAlertCount(notificationBadgeCount(storage.getTickets()));
+    refresh();
+    const unsub = storage.subscribe(refresh);
+    window.addEventListener(TICKET_NOTICE_EVENT, refresh);
+    return () => {
+      unsub();
+      window.removeEventListener(TICKET_NOTICE_EVENT, refresh);
+    };
+  }, []);
 
   const groups = useMemo(
     () =>
@@ -93,7 +107,12 @@ export function LeftSidebar({
                         }`}
                       >
                         <ModuleIcon iconName={mod.iconName} className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{mod.shortName}</span>
+                        <span className="truncate">{mod.id === 'tickets' ? 'Assigned to Ibrahim' : mod.shortName}</span>
+                        {mod.id === 'tickets' && assignedAlertCount > 0 && (
+                          <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950">
+                            {assignedAlertCount}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
