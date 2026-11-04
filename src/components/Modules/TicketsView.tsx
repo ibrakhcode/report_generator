@@ -346,7 +346,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   const recap = useMemo(() => ticketMonthRecap(selectedMonth), [selectedMonth, tickets, workspaceRevision]);
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-3">
+    <div className="h-full min-h-0 flex flex-col gap-3 overflow-y-auto md:overflow-hidden">
       {/* Header */}
       <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -396,7 +396,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
         </div>
       </div>
 
-      <div className="shrink-0 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+      <div className="shrink-0 flex md:grid overflow-x-auto md:overflow-visible grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 pb-1 -mx-1 px-1">
         {[
           { label: 'Assigned open', value: dash.assignedOpen, run: () => { setDeskFilter('assigned'); setLaneFilter('open'); } },
           { label: 'Unassigned open', value: dash.unassignedOpen, run: () => { setDeskFilter('unassigned'); setLaneFilter('open'); } },
@@ -409,7 +409,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
             key={card.label}
             type="button"
             onClick={card.run}
-            className="rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-left hover:border-teal-500/50"
+            className="min-w-[8.5rem] md:min-w-0 rounded-xl border border-slate-700 bg-slate-900/70 px-3 py-2 text-left hover:border-teal-500/50"
           >
             <p className="text-[10px] uppercase tracking-wide text-slate-500 font-semibold">{card.label}</p>
             <p className="text-xl font-black text-white font-mono mt-1">{card.value}</p>
@@ -417,7 +417,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
         ))}
       </div>
 
-      <div className="shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2">
+      <div className="hidden md:block shrink-0 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2">
         <p className="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">What happened this month</p>
         <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">{recap.narrative}</p>
       </div>
@@ -480,8 +480,8 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
       </div>
 
       {/* Tickets List */}
-      <div className="flex-1 min-h-[240px] bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl flex flex-col">
-        <div className="flex-1 min-h-0 overflow-auto">
+      <div className="flex-1 min-h-[60vh] md:min-h-0 bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-xl flex flex-col">
+        <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto">
           <table className="w-full text-left text-xs border-separate border-spacing-0">
             <thead className="sticky top-0 z-20 bg-slate-900 [&_th]:bg-slate-900 text-slate-400 border-b border-slate-700 uppercase tracking-wider text-[10px] font-semibold">
               <tr>
@@ -626,7 +626,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
       {/* Ticket Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-hidden">
-          <div className="bg-slate-900 border border-slate-800 sm:rounded-2xl rounded-t-2xl max-w-2xl w-full text-slate-100 shadow-2xl max-h-[100dvh] sm:max-h-[92dvh] flex flex-col">
+          <div className="bg-slate-900 border border-slate-800 sm:rounded-2xl rounded-t-2xl max-w-2xl w-full h-[90dvh] sm:h-auto text-slate-100 shadow-2xl max-h-[100dvh] sm:max-h-[92dvh] flex flex-col min-h-0">
             <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-800 shrink-0">
               <h3 className="text-base font-bold text-white">
                 {editingTicket ? `Edit Support Ticket: ${editingTicket.id}` : 'Open Support Ticket'}
