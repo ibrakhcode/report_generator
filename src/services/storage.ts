@@ -313,10 +313,8 @@ class StorageService {
   }
 
   public async refreshRemoteSources(): Promise<void> {
-    const helpdeskPromise = this.fetchHelpdeskPayload();
     await this.syncFromCloud();
-    const helpdesk = await helpdeskPromise;
-    if (helpdesk) this.mergeExternalHelpdesk(helpdesk.tickets || [], helpdesk.activities || []);
+    await this.pullHelpdesk();
   }
 
   public async syncFromCloud(): Promise<void> {
@@ -375,8 +373,21 @@ class StorageService {
       if (!cloud) return;
       this.writeArray(base, cloud, { cloud: false });
     };
-    takeCloud(data.activities, STORAGE_KEYS.ACTIVITIES);
-    takeCloud(data.tickets, STORAGE_KEYS.TICKETS);
+    const takeCloudKeepExt = <T extends { id: string }>(
+      cloud: T[] | undefined,
+      base: string,
+      prefixes: string[]
+    ) => {
+      if (!cloud) return;
+      const local = this.readArray<T>(base);
+      const extra = local.filter(
+        (item) =>
+          prefixes.some((prefix) => item.id.startsWith(prefix)) && !cloud.some((row) => row.id === item.id)
+      );
+      this.writeArray(base, [...cloud, ...extra], { cloud: false });
+    };
+    takeCloudKeepExt(data.activities, STORAGE_KEYS.ACTIVITIES, ['ACT-EXT-']);
+    takeCloudKeepExt(data.tickets, STORAGE_KEYS.TICKETS, ['TCK-EXT-']);
     takeCloud(data.sapIssues, STORAGE_KEYS.SAP_ISSUES);
     takeCloud(data.projects, STORAGE_KEYS.PROJECTS);
     takeCloud(data.kpis, STORAGE_KEYS.KPIS);

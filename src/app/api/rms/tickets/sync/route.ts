@@ -18,26 +18,34 @@ export async function POST() {
     const remote = await pullRemoteTickets();
     let imported = 0;
     let skipped = 0;
+    let tickets = [] as ReturnType<typeof rowToTicket>[];
+    let activities = [] as ReturnType<typeof rowToActivity>[];
     if (remote != null) {
       const pulled = await upsertAssignedTickets(supabase, remote);
       imported = pulled.imported;
       skipped = pulled.skipped;
+      tickets = pulled.tickets;
+      activities = pulled.activities;
     }
 
-    const [ticketsRes, activitiesRes] = await Promise.all([
-      supabase.from('tickets').select('*').eq('owner_user_id', session.userId).like('id', 'TCK-EXT-%'),
-      supabase.from('daily_activities').select('*').eq('owner_user_id', session.userId).like('id', 'ACT-EXT-%')
-    ]);
-    if (ticketsRes.error) throw new Error(ticketsRes.error.message);
-    if (activitiesRes.error) throw new Error(activitiesRes.error.message);
+    if (!tickets.length) {
+      const [ticketsRes, activitiesRes] = await Promise.all([
+        supabase.from('tickets').select('*').like('id', 'TCK-EXT-%'),
+        supabase.from('daily_activities').select('*').like('id', 'ACT-EXT-%')
+      ]);
+      if (ticketsRes.error) throw new Error(ticketsRes.error.message);
+      if (activitiesRes.error) throw new Error(activitiesRes.error.message);
+      tickets = (ticketsRes.data || []).map((row) => rowToTicket(row as Record<string, unknown>));
+      activities = (activitiesRes.data || []).map((row) => rowToActivity(row as Record<string, unknown>));
+    }
 
     return NextResponse.json({
       ok: true,
       imported,
       skipped,
       pulledRemote: remote != null,
-      tickets: (ticketsRes.data || []).map((row) => rowToTicket(row as Record<string, unknown>)),
-      activities: (activitiesRes.data || []).map((row) => rowToActivity(row as Record<string, unknown>))
+      tickets,
+      activities
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to sync tickets.';

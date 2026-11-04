@@ -171,7 +171,10 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
 
   const filtered = useMemo(() => {
     return tickets.filter((tck) => {
-      const matchMonth = Boolean(tck.reportedAt && tck.reportedAt.startsWith(selectedMonth));
+      const matchMonth =
+        deskFilter === 'month'
+          ? Boolean(tck.reportedAt && tck.reportedAt.startsWith(selectedMonth))
+          : true;
       const matchDesk =
         deskFilter === 'assigned'
           ? isAssignedToIbrahim(tck)
