@@ -1,15 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { usePagedList } from '@/hooks/usePagedList';
 import { PageBar } from '@/components/System/PageBar';
 import { Download } from 'lucide-react';
 import { storage } from '../../services/storage';
 import { AuditLogEntry } from '../../types';
 import { TableSelectFilter, TableTextFilter, tableIncludes } from '@/components/System/TableColumnFilter';
+import { useAppSession } from '@/context/AppSessionContext';
 
 export const AuditLogView: React.FC = () => {
-  const [logs] = useState<AuditLogEntry[]>(() => storage.getAuditLogs());
+  const { workspaceRevision } = useAppSession();
+  const [logs, setLogs] = useState<AuditLogEntry[]>(() => storage.getAuditLogs());
+  useEffect(() => {
+    setLogs(storage.getAuditLogs());
+  }, [workspaceRevision]);
   const [timeFilter, setTimeFilter] = useState('');
   const [userFilter, setUserFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('All');

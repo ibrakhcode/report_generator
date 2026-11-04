@@ -58,7 +58,7 @@ export const AppLauncherGrid: React.FC<AppLauncherGridProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const categories = ['All', 'Operations', 'Reporting', 'Governance', 'Extended'];
+  const categories = ['All', 'Operations', 'Reporting', 'Extended'];
 
   const filteredModules = useMemo(() => {
     return APP_MODULES.filter((mod) => {

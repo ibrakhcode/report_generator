@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Layers, Plus, CheckSquare, Clock, Calendar, CheckCircle2, ChevronRight, X, Eye } from 'lucide-react';
 import { ProjectImprovement, ProjectMilestone } from '../../types';
 import { storage } from '../../services/storage';
@@ -15,10 +15,14 @@ import { recordIdsForSource } from '@/lib/reportPosts';
 import { defaultDateForMonth, projectSpansMonth } from '@/lib/selectedMonth';
 
 export const ProjectsView: React.FC = () => {
-  const { selectedMonth } = useAppSession();
+  const { selectedMonth, workspaceRevision } = useAppSession();
   const [projects, setProjects] = useState<ProjectImprovement[]>(() => storage.getProjects());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingProject, setViewingProject] = useState<ProjectImprovement | null>(null);
+
+  useEffect(() => {
+    setProjects(storage.getProjects());
+  }, [workspaceRevision, selectedMonth]);
 
   const users = storage.getCompanyUsers().filter((user) => user.active !== false);
   const emptyProject = (): Partial<ProjectImprovement> => ({

@@ -19,11 +19,14 @@
 
   html {
     --font-body: var(--font-jakarta), 'Plus Jakarta Sans', system-ui, sans-serif;
+    height: 100%;
+    overflow: hidden;
   }
 
   body {
     font-family: var(--font-body);
-    overflow-x: hidden;
+    height: 100%;
+    overflow: hidden;
   }
 
   code, pre, .font-mono {

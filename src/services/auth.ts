@@ -211,7 +211,7 @@ class AuthService {
     storage.saveUser(payload.user);
     this.recoveryCodeForDisplay = payload.recoveryCode || null;
     this.startSession(payload.user);
-    await storage.syncFromCloud();
+    void storage.refreshRemoteSources();
     storage.logAudit('CREATE', 'Authentication', payload.user.id, `Registered user account: ${payload.user.email} (${payload.user.role})`);
     return { success: true, recoveryCode: payload.recoveryCode };
   }
@@ -242,7 +242,7 @@ class AuthService {
       storage.setActiveCompany(payload.user.companyId);
     }
     storage.adoptWorkspaceForUser(payload.user);
-    await storage.syncFromCloud();
+    void storage.refreshRemoteSources();
     storage.logAudit('LOGIN', 'Authentication', payload.user.id, `User ${payload.user.email} signed in`);
     return { success: true };
   }

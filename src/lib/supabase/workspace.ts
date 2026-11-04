@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AppSettings, EvidenceFile, TrainingRecord } from '@/types';
 import type { RmsSession } from '@/lib/rmsSession';
+import { inYearMonth, isYearMonth } from '@/lib/selectedMonth';
 import {
   activityToRow,
   assetRecordToRow,
@@ -72,6 +73,42 @@ async function resolvedCompanyId(supabase: SupabaseClient, session: RmsSession):
   return (data?.company_id as string) || session.companyId || null;
 }
 
+async function companyOwnerIds(supabase: SupabaseClient, owner: string, companyId: string | null) {
+  if (!companyId) return [owner];
+  const { data, error } = await supabase.from('users').select('id').eq('company_id', companyId);
+  if (error) throw new Error(error.message);
+  return Array.from(new Set([owner, ...(data || []).map((row) => String(row.id)).filter(Boolean)]));
+}
+
+function trainingQuery(supabase: SupabaseClient, owner: string, companyId: string | null, ownerIds: string[]) {
+  if (companyId) {
+    return supabase
+      .from('training')
+      .select('*')
+      .or(`company_id.eq.${companyId},owner_user_id.in.(${ownerIds.join(',')})`);
+  }
+  return supabase.from('training').select('*').eq('owner_user_id', owner);
+}
+
+export async function listCompanyTraining(
+  supabase: SupabaseClient,
+  session: RmsSession,
+  month?: string
+): Promise<TrainingRecord[]> {
+  const owner = session.userId;
+  const companyId = await resolvedCompanyId(supabase, session);
+  const ownerIds = await companyOwnerIds(supabase, owner, companyId);
+  const result = await trainingQuery(supabase, owner, companyId, ownerIds);
+  if (result.error) throw new Error(result.error.message);
+  const rows = (result.data || []) as Record<string, unknown>[];
+  const mapped = rows.map((row) => rowToTraining(row));
+  if (!month || !isYearMonth(month)) return mapped;
+  const forMonth = mapped.filter(
+    (item) => inYearMonth(item.date, month) || inYearMonth(item.createdAt, month)
+  );
+  return forMonth.length ? forMonth : mapped;
+}
+
 async function replaceOwnerRows(
   supabase: SupabaseClient,
   table: string,
@@ -117,25 +154,28 @@ async function withSignedFiles(
   evidenceRows: Record<string, unknown>[]
 ) {
   const nextTraining = [...training];
-  for (let i = 0; i < trainingRows.length; i += 1) {
-    const path = String(trainingRows[i].signed_document_path || '');
-    if (!path) continue;
-    const signed = await supabase.storage.from('training-docs').createSignedUrl(path, 3600);
-    if (signed.data?.signedUrl) nextTraining[i].signedDocumentDataUrl = signed.data.signedUrl;
-  }
   const nextEvidence = [...evidence];
-  for (let i = 0; i < evidenceRows.length; i += 1) {
-    const path = String(evidenceRows[i].storage_path || '');
-    if (!path) continue;
-    const signed = await supabase.storage.from('evidence').createSignedUrl(path, 3600);
-    if (signed.data?.signedUrl) nextEvidence[i].dataUrl = signed.data.signedUrl;
-  }
+  await Promise.all([
+    ...trainingRows.map(async (row, index) => {
+      const path = String(row.signed_document_path || '');
+      if (!path) return;
+      const signed = await supabase.storage.from('training-docs').createSignedUrl(path, 3600);
+      if (signed.data?.signedUrl) nextTraining[index].signedDocumentDataUrl = signed.data.signedUrl;
+    }),
+    ...evidenceRows.map(async (row, index) => {
+      const path = String(row.storage_path || '');
+      if (!path) return;
+      const signed = await supabase.storage.from('evidence').createSignedUrl(path, 3600);
+      if (signed.data?.signedUrl) nextEvidence[index].dataUrl = signed.data.signedUrl;
+    })
+  ]);
   return { training: nextTraining, evidence: nextEvidence };
 }
 
 export async function readWorkspace(supabase: SupabaseClient, session: RmsSession) {
   const owner = session.userId;
   const companyId = await resolvedCompanyId(supabase, session);
+  const ownerIds = await companyOwnerIds(supabase, owner, companyId);
 
   const [
     activities,
@@ -160,7 +200,7 @@ export async function readWorkspace(supabase: SupabaseClient, session: RmsSessio
     supabase.from('projects').select('*').eq('owner_user_id', owner),
     supabase.from('kpis').select('*').eq('owner_user_id', owner),
     supabase.from('evidence').select('*').eq('owner_user_id', owner),
-    supabase.from('training').select('*').eq('owner_user_id', owner),
+    trainingQuery(supabase, owner, companyId, ownerIds),
     supabase.from('monthly_reports').select('*').eq('owner_user_id', owner),
     companyId
       ? supabase.from('report_templates').select('*').or(`company_id.is.null,company_id.eq.${companyId}`)

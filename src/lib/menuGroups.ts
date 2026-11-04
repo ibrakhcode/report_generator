@@ -1,6 +1,6 @@
 import { APP_MODULES, type AppModule } from '@/components/Navigation/ModuleRegistry';
 
-export type MenuGroupId = 'operations' | 'reporting' | 'governance';
+export type MenuGroupId = 'operations' | 'reporting';
 
 export interface MenuGroup {
   id: MenuGroupId;
@@ -24,13 +24,6 @@ export const MENU_GROUPS: MenuGroup[] = [
     category: 'Reporting',
     description: 'Monthly reports, report library, templates, and delivery',
     iconName: 'FileText'
-  },
-  {
-    id: 'governance',
-    name: 'Governance',
-    category: 'Governance',
-    description: 'KPIs, evidence, and audit trail',
-    iconName: 'ShieldCheck'
   }
 ];
 
@@ -50,7 +43,7 @@ export function modulesInGroup(groupId: string, allowedIds: string[]): AppModule
   return APP_MODULES.filter((item) => item.category === group.category && allowedIds.includes(item.id));
 }
 
-const STANDALONE_ORDER = ['email-agent', 'users', 'assets', 'settings', 'backup'];
+const STANDALONE_ORDER = ['email-agent', 'users', 'assets', 'settings', 'audit', 'backup'];
 
 export function standaloneModules(allowedIds: string[]): AppModule[] {
   const groupedCategories = MENU_GROUPS.map((group) => group.category);
@@ -64,6 +57,6 @@ export function standaloneModules(allowedIds: string[]): AppModule[] {
 }
 
 export function pathToGroupId(pathname: string): MenuGroupId | null {
-  const match = pathname.match(/^\/menu\/(operations|reporting|governance)$/);
+  const match = pathname.match(/^\/menu\/(operations|reporting)$/);
   return (match?.[1] as MenuGroupId) || null;
 }

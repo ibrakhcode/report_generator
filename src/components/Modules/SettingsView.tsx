@@ -58,7 +58,7 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -88,7 +88,7 @@ export const SettingsView: React.FC = () => {
         </div>
       )}
 
-      <form onSubmit={handleSave} className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+      <form onSubmit={handleSave} className="flex-1 min-h-0 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
         <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4 md:col-span-2">
           <h3 className="text-sm font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-700">
             <Shield className="w-4 h-4 text-amber-400" />

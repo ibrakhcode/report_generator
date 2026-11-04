@@ -49,12 +49,14 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   const [viewingItem, setViewingItem] = useState<DailyActivity | null>(null);
   const autoSave = useAutoSaveEnabled();
   const { workspaceRevision } = useAppSession();
-  const departments = storage.getDepartmentNames();
-  const devices = storage.getDeviceNames();
+  const [departments, setDepartments] = useState(() => storage.getDepartmentNames());
+  const [devices, setDevices] = useState(() => storage.getDeviceNames());
   const defaultDepartment = departments[0] || '';
 
   useEffect(() => {
     setActivities(storage.getActivities());
+    setDepartments(storage.getDepartmentNames());
+    setDevices(storage.getDeviceNames());
   }, [workspaceRevision, selectedMonth]);
 
   const dateInSelectedMonth = () => {
@@ -245,7 +247,7 @@ export const ActivitiesView: React.FC<ActivitiesViewProps> = ({ selectedMonth })
   return (
     <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Header bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>Daily Activity Register</span>

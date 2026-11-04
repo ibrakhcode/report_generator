@@ -47,7 +47,8 @@ function allowedModuleIds(user: User | null): string[] {
   const isAdmin = Boolean(
     isImani || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'administrator'
   );
-  const withoutHidden = (ids: string[]) => ids.filter((id) => id !== 'sap' && id !== 'ai-assistant');
+  const withoutHidden = (ids: string[]) =>
+    ids.filter((id) => id !== 'sap' && id !== 'ai-assistant' && id !== 'evidence');
   const forRole = (ids: string[]) => {
     let next = withoutHidden(ids).filter((id) => !ADMIN_ONLY_MODULE_IDS.includes(id) || isAdmin);
     if (!isManagerRole(user)) next = next.filter((id) => !MANAGER_ONLY_MODULE_IDS.includes(id));
@@ -89,19 +90,27 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
       setWorkspaceRevision((current) => current + 1);
     });
     let cancelled = false;
+    const timers: { id?: number } = {};
     void (async () => {
       await auth.restoreCloudSession();
       if (cancelled) return;
-        if (auth.getCurrentUser()) {
-        await storage.syncFromCloud();
-        if (cancelled) return;
-        setSelectedMonthState(readSelectedMonth());
-      }
       refreshSession();
       setReady(true);
+      if (!auth.getCurrentUser()) return;
+      const hydrate = async () => {
+        await storage.refreshRemoteSources();
+        if (cancelled) return;
+        setSelectedMonthState(readSelectedMonth());
+        refreshSession();
+      };
+      void hydrate();
+      timers.id = window.setInterval(() => {
+        void storage.refreshRemoteSources();
+      }, 60000);
     })();
     return () => {
       cancelled = true;
+      if (timers.id) window.clearInterval(timers.id);
       unsubAuth();
       unsubLock();
       unsubStorage();

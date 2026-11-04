@@ -204,16 +204,18 @@ export async function pullTiceketTickets(): Promise<Json[] | null> {
 const TICKET_COLUMNS =
   'id, ticket_number, subject, description, category, priority, status, customer_id, agent_id, department_id, created_at, updated_at';
 
-export async function claimHelpdeskTicket(rmsTicketId: string): Promise<Json> {
-  const client = ticeketSupabase();
-  if (!client) throw new Error('Help Desk is not configured.');
+function toHelpdeskStatus(rmsStatus: string, hasAgent: boolean) {
+  const value = rmsStatus.toLowerCase();
+  if (value === 'closed') return 'closed';
+  if (value === 'resolved') return 'resolved';
+  if (value === 'in progress') return 'in_progress';
+  if (value === 'awaiting vendor') return 'waiting';
+  return hasAgent ? 'assigned' : 'pending';
+}
+
+async function findHelpdeskTicketRow(client: SupabaseClient, rmsTicketId: string) {
   const external = rmsTicketId.replace(/^TCK-EXT-/i, '').trim();
   if (!external) throw new Error('This ticket has no Help Desk id.');
-
-  const agents = await findIbrahimProfiles(client);
-  const agent = agents[0];
-  if (!agent?.id) throw new Error('Ibrahim Help Desk profile was not found.');
-
   const byNumber = await client.from('tickets').select(TICKET_COLUMNS).eq('ticket_number', external).limit(1);
   if (byNumber.error) throw new Error(byNumber.error.message);
   let row = (byNumber.data?.[0] || null) as Json | null;
@@ -223,6 +225,18 @@ export async function claimHelpdeskTicket(rmsTicketId: string): Promise<Json> {
     row = (byId.data?.[0] || null) as Json | null;
   }
   if (!row?.id) throw new Error('Help Desk ticket was not found.');
+  return row;
+}
+
+export async function claimHelpdeskTicket(rmsTicketId: string): Promise<Json> {
+  const client = ticeketSupabase();
+  if (!client) throw new Error('Help Desk is not configured.');
+
+  const agents = await findIbrahimProfiles(client);
+  const agent = agents[0];
+  if (!agent?.id) throw new Error('Ibrahim Help Desk profile was not found.');
+
+  const row = await findHelpdeskTicketRow(client, rmsTicketId);
 
   const currentAgent = String(row.agent_id || '');
   const ibrahimIds = new Set(agents.map((item) => String(item.id)));
@@ -259,4 +273,40 @@ export async function claimHelpdeskTicket(rmsTicketId: string): Promise<Json> {
     ...mapHelpdeskTicket(saved, customer, agent as Json, true),
     _rmsSource: 'my-tickets'
   };
+}
+
+export async function pushHelpdeskTicketUpdate(input: {
+  rmsTicketId: string;
+  status: string;
+  assignedTechnician?: string;
+}): Promise<Json> {
+  const client = ticeketSupabase();
+  if (!client) throw new Error('Help Desk is not configured.');
+
+  const row = await findHelpdeskTicketRow(client, input.rmsTicketId);
+  const agents = await findIbrahimProfiles(client);
+  const ibrahim = agents[0];
+  const ibrahimIds = new Set(agents.map((item) => String(item.id)));
+  const technician = (input.assignedTechnician || '').toLowerCase();
+  const assignIbrahim =
+    technician.includes('ibrahim') || technician.includes('msambwe') || technician.includes('ibra');
+  let agentId = String(row.agent_id || '') || null;
+  if (assignIbrahim && ibrahim?.id) agentId = String(ibrahim.id);
+  if (technician === 'unassigned' && input.status !== 'Closed' && input.status !== 'Resolved') {
+    agentId = null;
+  }
+
+  const nextStatus = toHelpdeskStatus(input.status, Boolean(agentId));
+  const patch: Json = {
+    status: nextStatus,
+    updated_at: new Date().toISOString()
+  };
+  if (agentId !== undefined) patch.agent_id = agentId;
+
+  const updated = await client.from('tickets').update(patch).eq('id', row.id).select(TICKET_COLUMNS).limit(1);
+  if (updated.error) throw new Error(updated.error.message);
+  const saved = ((updated.data?.[0] || { ...row, ...patch }) as Json);
+  const agent = agentId ? ((await client.from('profiles').select('id, full_name, email, username, role').eq('id', agentId).limit(1)).data?.[0] as Json | undefined) : undefined;
+  const ibrahimAssigned = Boolean(agentId && ibrahimIds.has(String(agentId)));
+  return mapHelpdeskTicket(saved, undefined, agent, ibrahimAssigned);
 }

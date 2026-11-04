@@ -438,7 +438,7 @@ export function rowToTraining(row: Record<string, unknown>): TrainingRecord {
   return {
     id: text(row.id),
     title: text(row.title),
-    date: text(row.date),
+    date: dateOrNull(row.date) || dateOrNull(row.created_at) || '',
     topic: text(row.topic),
     targetAudience: text(row.target_audience),
     participantCount: num(row.participant_count),

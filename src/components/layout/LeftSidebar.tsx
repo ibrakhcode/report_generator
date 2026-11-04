@@ -58,7 +58,7 @@ export function LeftSidebar({
   };
 
   return (
-    <aside className={`flex w-[min(100%,260px)] shrink-0 h-full flex-col border-r border-slate-800 bg-slate-900 ${className}`}>
+    <aside className={`flex w-[min(100%,260px)] shrink-0 h-full flex-col overflow-hidden border-r border-slate-800 bg-slate-900 ${className}`}>
       <div className="px-4 py-3.5 border-b border-slate-800 flex items-center justify-between gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Navigation</p>
         {showClose && (

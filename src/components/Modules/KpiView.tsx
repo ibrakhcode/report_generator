@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Target,
   Plus,
@@ -85,8 +85,11 @@ const MOM_KPI_TREND_DATA = [
 ];
 
 export const KpiView: React.FC = () => {
-  const { selectedMonth } = useAppSession();
+  const { selectedMonth, workspaceRevision } = useAppSession();
   const [kpis, setKpis] = useState<KpiItem[]>(() => storage.getKpis());
+  useEffect(() => {
+    setKpis(storage.getKpis());
+  }, [workspaceRevision, selectedMonth]);
   const paged = usePagedList(kpis);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState<KpiItem | null>(null);
@@ -201,7 +204,7 @@ export const KpiView: React.FC = () => {
   return (
     <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <span>KPI Management & Performance Trends</span>
@@ -241,6 +244,7 @@ export const KpiView: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
       {/* --- RECHARTS MONTH-OVER-MONTH PERFORMANCE VISUALIZATION --- */}
       <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-5 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-700">
@@ -411,7 +415,7 @@ export const KpiView: React.FC = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 min-h-0 overflow-auto content-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
           {paged.pageItems.map((kpi) => (
             <div
               key={kpi.id}
@@ -501,6 +505,7 @@ export const KpiView: React.FC = () => {
           onPage={paged.setPage}
         />
       ) : null}
+      </div>
 
       {/* KPI Edit Modal */}
       {isModalOpen && (

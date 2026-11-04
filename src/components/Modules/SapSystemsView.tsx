@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Cpu, Plus, AlertCircle, CheckCircle2, ShieldCheck, X } from 'lucide-react';
 import { BusinessSystemIssue } from '../../types';
 import { storage } from '../../services/storage';
@@ -14,8 +14,11 @@ import { recordIdsForSource } from '@/lib/reportPosts';
 import { defaultDateForMonth, inYearMonth } from '@/lib/selectedMonth';
 
 export const SapSystemsView: React.FC = () => {
-  const { selectedMonth } = useAppSession();
+  const { selectedMonth, workspaceRevision } = useAppSession();
   const [issues, setIssues] = useState<BusinessSystemIssue[]>(() => storage.getSapIssues());
+  useEffect(() => {
+    setIssues(storage.getSapIssues());
+  }, [workspaceRevision, selectedMonth]);
   const monthIssues = useMemo(
     () => issues.filter((item) => inYearMonth(item.dateIdentified, selectedMonth)),
     [issues, selectedMonth]

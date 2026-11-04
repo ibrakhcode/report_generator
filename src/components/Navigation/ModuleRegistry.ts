@@ -57,21 +57,11 @@ export const APP_MODULES: AppModule[] = [
     id: 'kpis',
     name: 'KPI Management',
     shortName: 'KPI Matrix',
-    category: 'Governance',
+    category: 'Operations',
     description: 'JD-aligned targets, weighted calculations, and achievement scoring (managers only)',
     iconName: 'Target',
     badge: 'Manager',
     gradient: 'from-purple-500 via-indigo-500 to-blue-600',
-    iconColor: 'text-white'
-  },
-  {
-    id: 'evidence',
-    name: 'Documents',
-    shortName: 'Documents',
-    category: 'Governance',
-    description: 'Centralized repository for logs, approvals, signed files, and compliance documents',
-    iconName: 'FolderGit2',
-    gradient: 'from-sky-400 via-blue-500 to-indigo-600',
     iconColor: 'text-white'
   },
   {
@@ -169,7 +159,7 @@ export const APP_MODULES: AppModule[] = [
     id: 'audit',
     name: 'Audit Log',
     shortName: 'Audit Trail',
-    category: 'Governance',
+    category: 'Extended',
     description: 'Immutable record of logins, creations, modifications, and exports',
     iconName: 'ShieldCheck',
     gradient: 'from-blue-700 via-slate-800 to-zinc-900',

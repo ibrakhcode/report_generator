@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BookOpen, Plus, Users, Star, Calendar, FileText, X, Eye, Edit2 } from 'lucide-react';
 import { TrainingRecord } from '../../types';
 import { storage } from '../../services/storage';
@@ -11,11 +11,33 @@ import { PageBar } from '@/components/System/PageBar';
 import { PostToReportButton } from '@/components/System/PostToReportButton';
 import { useAppSession } from '@/context/AppSessionContext';
 import { recordIdsForSource } from '@/lib/reportPosts';
-import { defaultDateForMonth, inYearMonth } from '@/lib/selectedMonth';
+import { defaultDateForMonth } from '@/lib/selectedMonth';
 
 export const TrainingView: React.FC = () => {
-  const { selectedMonth } = useAppSession();
+  const { selectedMonth, workspaceRevision } = useAppSession();
   const [trainings, setTrainings] = useState<TrainingRecord[]>(() => storage.getTraining());
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const response = await fetch(`/api/rms/training?month=${encodeURIComponent(selectedMonth)}`, {
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        training?: TrainingRecord[];
+      };
+      if (cancelled) return;
+      if (response.ok && payload.ok && Array.isArray(payload.training)) {
+        setTrainings(payload.training);
+        return;
+      }
+      setTrainings(storage.getTraining());
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceRevision, selectedMonth]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [viewingItem, setViewingItem] = useState<TrainingRecord | null>(null);
 
@@ -31,10 +53,7 @@ export const TrainingView: React.FC = () => {
     evidenceFiles: []
   });
   const [formData, setFormData] = useState<Partial<TrainingRecord>>(emptyTraining);
-  const monthTrainings = useMemo(
-    () => trainings.filter((item) => inYearMonth(item.date, selectedMonth)),
-    [trainings, selectedMonth]
-  );
+  const monthTrainings = trainings;
   const paged = usePagedList(monthTrainings, selectedMonth);
 
   const handleOpenCreate = () => {
@@ -124,9 +143,9 @@ export const TrainingView: React.FC = () => {
           <div className="w-12 h-12 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center mx-auto text-xl">
             🎓
           </div>
-          <h3 className="text-base font-bold text-white">No training sessions for {selectedMonth}</h3>
+          <h3 className="text-base font-bold text-white">No training sessions in the database for {selectedMonth}</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-            Record cybersecurity awareness seminars, phishing defense drills, system workshops, and attendance sheets.
+            This list comes from Supabase. Add a session only if it is not already stored.
           </p>
           <button
             onClick={handleOpenCreate}

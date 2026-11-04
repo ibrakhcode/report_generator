@@ -38,8 +38,8 @@ export const BackupRestoreView: React.FC = () => {
   };
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto space-y-6">
-      <div>
+    <div className="h-full min-h-0 flex flex-col gap-3">
+      <div className="shrink-0">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <span>Database Backup, Disaster Recovery & Restore</span>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-800 text-emerald-400 font-mono border border-slate-700">
@@ -51,6 +51,7 @@ export const BackupRestoreView: React.FC = () => {
         </p>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
       {restoreStatus && (
         <div
           className={`p-4 rounded-2xl border text-xs flex items-start gap-3 ${
@@ -174,6 +175,7 @@ export const BackupRestoreView: React.FC = () => {
         <p className="leading-relaxed">
           Daily differential database snapshots are replicated to offsite cloud storage every night at 23:00 EAT. In case of host failure or database corruption, use the restore tool above to roll back to the verified snapshot.
         </p>
+      </div>
       </div>
     </div>
   );

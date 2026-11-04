@@ -1,6 +1,6 @@
 import type { DailyActivity, SupportTicket, TicketCategory, TicketStatus } from '@/types';
 import { DEFAULT_ADMIN_EMAIL } from '@/lib/authConstants';
-import { activityToRow, ticketToRow } from '@/lib/supabase/rmsMap';
+import { activityToRow, rowToTicket, ticketToRow } from '@/lib/supabase/rmsMap';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const TICKET_EXT_PREFIX = 'TCK-EXT-';
@@ -224,7 +224,7 @@ export function mapExternalTicket(raw: Json): SupportTicket | null {
     evidenceFiles: [],
     escalationNotes: pick(raw, ['url', 'link', 'ticketUrl', 'html_url']) || undefined,
     createdAt: pick(raw, ['createdAt', 'created_at']) || now,
-    updatedAt: now
+    updatedAt: pick(raw, ['updatedAt', 'updated_at']) || now
   };
   return ticket;
 }
@@ -307,9 +307,43 @@ export async function upsertAssignedTickets(
   }
 
   if (tickets.length) {
-    const ticketRows = tickets.map((item) => ticketToRow(item, String(owner.id), (owner.company_id as string) || null));
+    const existing = await supabase
+      .from('tickets')
+      .select('*')
+      .eq('owner_user_id', String(owner.id))
+      .in(
+        'id',
+        tickets.map((item) => item.id)
+      );
+    if (existing.error) throw new Error(existing.error.message);
+    const existingById = new Map(
+      (existing.data || []).map((row) => [String(row.id), rowToTicket(row as Record<string, unknown>)])
+    );
+    const mergedTickets = tickets.map((item) => {
+      const current = existingById.get(item.id);
+      if (!current) return item;
+      const genericAction = (item.actionsTaken || '').startsWith('Imported from external');
+      return {
+        ...current,
+        title: item.title || current.title,
+        description: item.description || current.description,
+        status: item.status,
+        assignedTechnician: item.assignedTechnician,
+        priority: item.priority || current.priority,
+        category: item.category || current.category,
+        resolvedAt: item.resolvedAt || current.resolvedAt,
+        updatedAt: item.updatedAt || current.updatedAt,
+        actionsTaken: genericAction ? current.actionsTaken : item.actionsTaken || current.actionsTaken,
+        resolution: item.resolution || current.resolution,
+        rootCause: item.rootCause || current.rootCause
+      };
+    });
+    const ticketRows = mergedTickets.map((item) =>
+      ticketToRow(item, String(owner.id), (owner.company_id as string) || null)
+    );
     const ticketWrite = await supabase.from('tickets').upsert(ticketRows, { onConflict: 'id' });
     if (ticketWrite.error) throw new Error(ticketWrite.error.message);
+    tickets.splice(0, tickets.length, ...mergedTickets);
   }
   if (activities.length) {
     const activityRows = activities.map((item) =>

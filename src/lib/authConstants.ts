@@ -9,7 +9,6 @@ export const ALL_MODULE_IDS = [
   'tickets',
   'projects',
   'kpis',
-  'evidence',
   'training',
   'reports',
   'report-library',

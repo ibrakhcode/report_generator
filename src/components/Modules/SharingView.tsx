@@ -172,14 +172,15 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
   );
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto space-y-6">
-      <div>
+    <div className="h-full min-h-0 flex flex-col gap-3">
+      <div className="shrink-0">
         <h2 className="text-xl font-bold text-white">Report Delivery</h2>
         <p className="text-xs text-slate-400 mt-1">
           Select a template for look only. Send and Download fill Daily Work, Helpdesk, and Projects for the selected month.
         </p>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
       {emailSentStatus && (
         <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -289,6 +290,7 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
             </button>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

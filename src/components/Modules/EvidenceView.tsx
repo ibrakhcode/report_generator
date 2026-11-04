@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FolderGit2, Upload, File, Download, Trash2, Search, Filter, Paperclip, X } from 'lucide-react';
 import { EvidenceFile } from '../../types';
 import { storage } from '../../services/storage';
@@ -12,8 +12,11 @@ import { useAppSession } from '@/context/AppSessionContext';
 import { inYearMonth } from '@/lib/selectedMonth';
 
 export const EvidenceView: React.FC = () => {
-  const { selectedMonth } = useAppSession();
+  const { selectedMonth, workspaceRevision } = useAppSession();
   const [evidenceList, setEvidenceList] = useState<EvidenceFile[]>(() => storage.getEvidence());
+  useEffect(() => {
+    setEvidenceList(storage.getEvidence());
+  }, [workspaceRevision, selectedMonth]);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);

@@ -145,7 +145,7 @@ export const TemplateDesignerView: React.FC = () => {
   };
 
   return (
-    <form onSubmit={handleSave} className="h-full min-h-0 overflow-y-auto space-y-6">
+    <form onSubmit={handleSave} className="h-full min-h-0 flex flex-col gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-white">Report Template Designer</h2>
@@ -189,6 +189,7 @@ export const TemplateDesignerView: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
       <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4">
         <h3 className="text-sm font-bold text-white flex items-center gap-2 pb-2 border-b border-slate-700">
           <Sparkles className="w-4 h-4 text-amber-400" />
@@ -454,6 +455,7 @@ export const TemplateDesignerView: React.FC = () => {
             <div className="text-[9px] text-slate-300 pt-2 border-t border-white/20">{activeTemplate.footerText}</div>
           </div>
         </div>
+      </div>
       </div>
 
       {liveMode && (

@@ -103,9 +103,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedMonth, onN
   };
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto space-y-6 animate-in fade-in duration-150">
+    <div className="h-full min-h-0 flex flex-col gap-4 animate-in fade-in duration-150">
       {/* Top Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-[28px] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
+      <div className="shrink-0 bg-slate-900 border border-slate-800 rounded-[28px] p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm relative overflow-hidden">
         <div className="relative z-10 max-w-2xl space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-semibold">
             <Calendar className="w-3.5 h-3.5" />
@@ -146,6 +146,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedMonth, onN
         </div>
       </div>
 
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
       {/* 5 Core Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Completed Activities */}
@@ -419,6 +420,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ selectedMonth, onN
             )}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

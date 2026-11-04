@@ -55,7 +55,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }}
         />
       </head>
-      <body className="bg-slate-950 text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
+      <body className="h-dvh overflow-hidden bg-slate-950 text-slate-100 antialiased selection:bg-blue-600 selection:text-white">
         <AppSessionProvider>
           <AppearanceProvider>
             {children}

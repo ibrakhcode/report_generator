@@ -18,7 +18,8 @@ import {
   MasterSystemKey
 } from '../types';
 import type { RmsCollection } from '@/lib/supabase/rmsMap';
-import { inYearMonth, projectSpansMonth } from '@/lib/selectedMonth';
+import { inYearMonth, isYearMonth, projectSpansMonth, readSelectedMonth } from '@/lib/selectedMonth';
+import { notify } from '@/lib/systemNotify';
 
 const STORAGE_KEYS = {
   ACTIVITIES: 'hesu_app_activities_v4',
@@ -285,9 +286,42 @@ class StorageService {
     return Array.from(map.values());
   }
 
+  private async fetchHelpdeskPayload(): Promise<{
+    tickets?: SupportTicket[];
+    activities?: DailyActivity[];
+  } | null> {
+    if (typeof window === 'undefined') return null;
+    const response = await fetch('/api/rms/tickets/sync', {
+      method: 'POST',
+      credentials: 'include',
+      cache: 'no-store'
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      tickets?: SupportTicket[];
+      activities?: DailyActivity[];
+    };
+    if (!payload.ok) return null;
+    return payload;
+  }
+
+  public async pullHelpdesk(): Promise<void> {
+    const payload = await this.fetchHelpdeskPayload();
+    if (!payload) return;
+    this.mergeExternalHelpdesk(payload.tickets || [], payload.activities || []);
+  }
+
+  public async refreshRemoteSources(): Promise<void> {
+    const helpdeskPromise = this.fetchHelpdeskPayload();
+    await this.syncFromCloud();
+    const helpdesk = await helpdeskPromise;
+    if (helpdesk) this.mergeExternalHelpdesk(helpdesk.tickets || [], helpdesk.activities || []);
+  }
+
   public async syncFromCloud(): Promise<void> {
     if (typeof window === 'undefined') return;
-    const response = await fetch('/api/rms/workspace');
+    const response = await fetch('/api/rms/workspace', { credentials: 'include', cache: 'no-store' });
     if (!response.ok) return;
     const payload = (await response.json()) as {
       ok?: boolean;
@@ -337,26 +371,19 @@ class StorageService {
     assetRecords?: AssetRecord[];
     settings?: AppSettings | null;
   }) {
-    const takeMerged = <T extends { id: string }>(
-      cloud: T[] | undefined,
-      local: T[],
-      base: string,
-      collection: RmsCollection
-    ) => {
+    const takeCloud = <T>(cloud: T[] | undefined, base: string) => {
       if (!cloud) return;
-      const merged = this.mergeById(cloud, local);
-      this.writeArray(base, merged, { cloud: false });
-      if (merged.length > cloud.length) this.persistQueue.set(collection, merged);
+      this.writeArray(base, cloud, { cloud: false });
     };
-    takeMerged(data.activities, this.getActivities(), STORAGE_KEYS.ACTIVITIES, 'activities');
-    takeMerged(data.tickets, this.getTickets(), STORAGE_KEYS.TICKETS, 'tickets');
-    takeMerged(data.sapIssues, this.getSapIssues(), STORAGE_KEYS.SAP_ISSUES, 'sapIssues');
-    takeMerged(data.projects, this.getProjects(), STORAGE_KEYS.PROJECTS, 'projects');
-    takeMerged(data.kpis, this.getKpis(), STORAGE_KEYS.KPIS, 'kpis');
-    takeMerged(data.evidence, this.getEvidence(), STORAGE_KEYS.EVIDENCE, 'evidence');
-    takeMerged(data.training, this.getTraining(), STORAGE_KEYS.TRAINING, 'training');
-    takeMerged(data.reports, this.getReports(), STORAGE_KEYS.REPORTS, 'reports');
-    takeMerged(data.reportPosts, this.getReportPosts(), STORAGE_KEYS.REPORT_POSTS, 'reportPosts');
+    takeCloud(data.activities, STORAGE_KEYS.ACTIVITIES);
+    takeCloud(data.tickets, STORAGE_KEYS.TICKETS);
+    takeCloud(data.sapIssues, STORAGE_KEYS.SAP_ISSUES);
+    takeCloud(data.projects, STORAGE_KEYS.PROJECTS);
+    takeCloud(data.kpis, STORAGE_KEYS.KPIS);
+    takeCloud(data.evidence, STORAGE_KEYS.EVIDENCE);
+    takeCloud(data.training, STORAGE_KEYS.TRAINING);
+    takeCloud(data.reports, STORAGE_KEYS.REPORTS);
+    takeCloud(data.reportPosts, STORAGE_KEYS.REPORT_POSTS);
     if (data.templates) {
       this.writeArray(STORAGE_KEYS.TEMPLATES, data.templates, { cloud: false });
     }
@@ -366,10 +393,10 @@ class StorageService {
     if (data.audit) {
       this.memWrite(STORAGE_KEYS.AUDIT, JSON.stringify(data.audit));
     }
-    if (data.assetDefinitions) {
+    if (data.assetDefinitions?.length) {
       this.memWrite(STORAGE_KEYS.ASSET_DEFINITIONS, JSON.stringify(data.assetDefinitions));
     }
-    if (data.assetRecords) {
+    if (data.assetRecords?.length) {
       this.writeAllAssetRecords(data.assetRecords, { cloud: false });
     }
     if (data.settings) {
@@ -512,10 +539,21 @@ class StorageService {
   }
 
   private getMasterNames(key: MasterSystemKey): string[] {
-    const definition = this.getDefinitionBySystemKey(key);
-    if (!definition) return [];
+    const seed = SYSTEM_DEFINITIONS.find((item) => item.systemKey === key);
+    const definitionIds = new Set(
+      this.getAssetDefinitions()
+        .filter(
+          (item) =>
+            item.systemKey === key ||
+            item.id === seed?.id ||
+            item.name.trim().toLowerCase() === (seed?.name || key).toLowerCase()
+        )
+        .map((item) => item.id)
+    );
+    if (seed) definitionIds.add(seed.id);
+    if (!definitionIds.size) return [];
     return this.getAssetRecords()
-      .filter((item) => item.definitionId === definition.id)
+      .filter((item) => definitionIds.has(item.definitionId))
       .map((item) => item.name)
       .filter(Boolean);
   }
@@ -727,6 +765,7 @@ class StorageService {
       this.logAudit('CREATE', 'Daily Activities', activity.id, `Created activity: ${activity.title}`);
     }
     this.writeArray(STORAGE_KEYS.ACTIVITIES, list);
+    this.placeRecordInReport('activities', toSave.id, toSave.date);
     this.notify();
     return toSave;
   }
@@ -766,6 +805,7 @@ class StorageService {
       updatedAt: now
     };
 
+    const previous = idx >= 0 ? list[idx] : null;
     if (idx >= 0) {
       list[idx] = toSave;
       this.logAudit('UPDATE', 'IT Support Tickets', ticket.id, `Updated ticket: ${ticket.title} (${ticket.status})`);
@@ -775,7 +815,34 @@ class StorageService {
       this.logAudit('CREATE', 'IT Support Tickets', ticket.id, `Opened ticket: ${ticket.title}`);
     }
     this.writeArray(STORAGE_KEYS.TICKETS, list);
+    this.placeRecordInReport('tickets', toSave.id, toSave.reportedAt);
     this.notify();
+    if (
+      typeof window !== 'undefined' &&
+      toSave.id.startsWith('TCK-EXT-') &&
+      previous &&
+      (previous.status !== toSave.status || previous.assignedTechnician !== toSave.assignedTechnician)
+    ) {
+      void fetch('/api/rms/tickets/push', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: toSave.id,
+          status: toSave.status,
+          assignedTechnician: toSave.assignedTechnician
+        })
+      })
+        .then(async (response) => {
+          const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+          if (!response.ok || !payload.ok) {
+            notify.error('Help Desk was not updated', payload.error || 'Close or pick again so both systems match.');
+          }
+        })
+        .catch(() => {
+          notify.error('Help Desk was not updated', 'Check the connection and save the ticket again.');
+        });
+    }
     return toSave;
   }
 
@@ -788,7 +855,28 @@ class StorageService {
 
   public mergeExternalHelpdesk(tickets: SupportTicket[], activities: DailyActivity[]) {
     if (tickets.length) {
-      this.writeArray(STORAGE_KEYS.TICKETS, this.mergeById(tickets, this.getTickets()), { cloud: false });
+      const current = this.getTickets();
+      const byId = new Map(current.map((item) => [item.id, item]));
+      const merged = tickets.map((item) => {
+        const existing = byId.get(item.id);
+        if (!existing) return item;
+        const genericAction = (item.actionsTaken || '').startsWith('Imported from external');
+        return {
+          ...existing,
+          title: item.title || existing.title,
+          description: item.description || existing.description,
+          status: item.status,
+          assignedTechnician: item.assignedTechnician,
+          priority: item.priority || existing.priority,
+          category: item.category || existing.category,
+          resolvedAt: item.resolvedAt || existing.resolvedAt,
+          updatedAt: item.updatedAt || existing.updatedAt,
+          actionsTaken: genericAction ? existing.actionsTaken : item.actionsTaken || existing.actionsTaken,
+          resolution: item.resolution || existing.resolution,
+          rootCause: item.rootCause || existing.rootCause
+        };
+      });
+      this.writeArray(STORAGE_KEYS.TICKETS, this.mergeById(merged, current), { cloud: false });
     }
     if (activities.length) {
       this.writeArray(STORAGE_KEYS.ACTIVITIES, this.mergeById(activities, this.getActivities()), { cloud: false });
@@ -816,6 +904,7 @@ class StorageService {
       this.logAudit('CREATE', 'SAP & Business Systems', issue.id, `Logged system issue: ${issue.systemName}`);
     }
     this.writeArray(STORAGE_KEYS.SAP_ISSUES, list);
+    this.placeRecordInReport('sap', toSave.id, toSave.dateIdentified);
     this.notify();
     return toSave;
   }
@@ -860,6 +949,7 @@ class StorageService {
       this.logAudit('CREATE', 'Projects & Improvements', project.id, `Created project: ${project.name}`);
     }
     this.writeArray(STORAGE_KEYS.PROJECTS, list);
+    this.placeRecordInReport('projects', toSave.id, toSave.startDate || toSave.targetCompletionDate);
     this.notify();
     return toSave;
   }
@@ -911,6 +1001,7 @@ class StorageService {
       this.logAudit('CREATE', 'KPI Management', kpi.id, `Created KPI: ${kpi.name}`);
     }
     this.writeArray(STORAGE_KEYS.KPIS, list);
+    this.placeRecordInReport('kpis', toSave.id, `${readSelectedMonth()}-01`);
     this.notify();
     return toSave;
   }
@@ -1073,6 +1164,7 @@ class StorageService {
     this.persistNow('training', list);
     const slim = list.map((item) => ({ ...item, signedDocumentDataUrl: undefined }));
     this.writeArray(STORAGE_KEYS.TRAINING, slim, { cloud: false });
+    this.placeRecordInReport('training', record.id, record.date || record.createdAt);
     this.notify();
     return { ...record, signedDocumentDataUrl: undefined };
   }
@@ -1186,6 +1278,23 @@ class StorageService {
 
   public getReportPosts(): ReportPost[] {
     return this.readArray<ReportPost>(STORAGE_KEYS.REPORT_POSTS);
+  }
+
+  private placeRecordInReport(source: ReportPostSource, recordId: string, dateValue?: string) {
+    const month = String(dateValue || '').slice(0, 7);
+    if (!isYearMonth(month) || !recordId) return;
+    if (!this.isPostedToReport(source, recordId, month)) {
+      const list = this.getReportPosts();
+      list.push({
+        id: `POST-${month}-${source}-${recordId}`,
+        month,
+        source,
+        recordId,
+        postedAt: nowIso()
+      });
+      this.writeArray(STORAGE_KEYS.REPORT_POSTS, list);
+    }
+    this.syncMonthlyReportFromPosts(month);
   }
 
   public isPostedToReport(source: ReportPostSource, recordId: string, month: string) {
@@ -1464,14 +1573,16 @@ class StorageService {
     const companyDef = this.getDefinitionBySystemKey('company');
     const activeId = this.getActiveCompanyId();
     const session = this.getSessionUser();
+    const companyScope = activeId || session?.companyId || '';
     return all.filter((item) => {
       if (companyDef && item.definitionId === companyDef.id) {
         if (session?.companyId) return item.id === session.companyId;
         return true;
       }
       if (!session?.id) return false;
-      if (item.ownerUserId) return item.ownerUserId === session.id;
-      return Boolean(session.workspaceOwner && activeId && item.companyId === activeId);
+      if (companyScope && item.companyId === companyScope) return true;
+      if (item.ownerUserId === session.id && (!item.companyId || item.companyId === companyScope)) return true;
+      return false;
     });
   }
 

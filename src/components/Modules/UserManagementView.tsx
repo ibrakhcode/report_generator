@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Users,
   Plus,
@@ -22,7 +22,7 @@ import { User, UserRole } from '../../types';
 import { storage } from '../../services/storage';
 import { auth, DEFAULT_ADMIN_EMAIL } from '../../services/auth';
 import { notify } from '@/lib/systemNotify';
-import { ADMIN_ONLY_MODULE_IDS, MANAGER_ONLY_MODULE_IDS, isManagerRole } from '@/context/AppSessionContext';
+import { ADMIN_ONLY_MODULE_IDS, MANAGER_ONLY_MODULE_IDS, isManagerRole, useAppSession } from '@/context/AppSessionContext';
 import { SuggestField } from '@/components/System/SuggestField';
 import { APP_MODULES, AppModule } from '../Navigation/ModuleRegistry';
 import { usePagedList } from '@/hooks/usePagedList';
@@ -34,11 +34,15 @@ interface UserManagementViewProps {
 }
 
 export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentUser: propUser }) => {
+  const { workspaceRevision } = useAppSession();
   const currentUser = propUser || auth.getCurrentUser();
   const isImani = Boolean(currentUser?.email?.toLowerCase() === DEFAULT_ADMIN_EMAIL.toLowerCase());
   const isAdmin = Boolean(isImani || currentUser?.role?.toLowerCase() === 'admin' || currentUser?.role?.toLowerCase() === 'administrator');
 
   const [users, setUsers] = useState<User[]>(() => storage.getCompanyUsers(currentUser?.companyId));
+  useEffect(() => {
+    setUsers(storage.getCompanyUsers(currentUser?.companyId));
+  }, [workspaceRevision, currentUser?.companyId]);
   const [userColFilter, setUserColFilter] = useState('');
   const [titleColFilter, setTitleColFilter] = useState('');
   const [roleColFilter, setRoleColFilter] = useState('All');
@@ -153,7 +157,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       setFormData({
         ...formData,
         allowedModules: withoutKpisIfOfficer(
-          ['dashboard', 'kpis', 'evidence', 'reports', 'report-library', 'sharing'],
+          ['dashboard', 'kpis', 'reports', 'report-library', 'sharing'],
           formData.role
         )
       });
@@ -170,7 +174,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     } else if (preset === 'reports') {
       setTargetModules(
         withoutKpisIfOfficer(
-          ['dashboard', 'kpis', 'evidence', 'reports', 'report-library', 'sharing'],
+          ['dashboard', 'kpis', 'reports', 'report-library', 'sharing'],
           selectedUserForPerms?.role
         )
       );
@@ -278,7 +282,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
   };
 
   // Group modules by category for clean UI rendering
-  const categories = ['Operations', 'Reporting', 'Governance', 'Extended'] as const;
+  const categories = ['Operations', 'Reporting', 'Extended'] as const;
 
   return (
     <div className="h-full min-h-0 flex flex-col gap-3">

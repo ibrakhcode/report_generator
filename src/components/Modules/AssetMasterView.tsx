@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Save, Trash2, Package } from 'lucide-react';
 import { AssetDefinition, AssetField, AssetFieldType, AssetRecord } from '@/types';
 import { storage } from '@/services/storage';
@@ -10,6 +10,7 @@ import { SuggestField } from '@/components/System/SuggestField';
 import { usePagedList } from '@/hooks/usePagedList';
 import { PageBar } from '@/components/System/PageBar';
 import { TableTextFilter, tableIncludes } from '@/components/System/TableColumnFilter';
+import { useAppSession } from '@/context/AppSessionContext';
 
 const FIELD_TYPES: AssetFieldType[] = ['text', 'number', 'date', 'textarea', 'select'];
 
@@ -24,6 +25,7 @@ const emptyDefinition = (): AssetDefinition => ({
 
 export function AssetMasterView() {
   const autoSave = useAutoSaveEnabled();
+  const { workspaceRevision } = useAppSession();
   const [definitions, setDefinitions] = useState<AssetDefinition[]>(() => storage.getAssetDefinitions());
   const [records, setRecords] = useState<AssetRecord[]>(() => storage.getAssetRecords());
   const [tab, setTab] = useState<'define' | 'record'>('define');
@@ -36,6 +38,11 @@ export function AssetMasterView() {
   const [assetNameFilter, setAssetNameFilter] = useState('');
   const [assetTypeFilter, setAssetTypeFilter] = useState('');
   const [assetDataFilter, setAssetDataFilter] = useState('');
+
+  useEffect(() => {
+    setDefinitions(storage.getAssetDefinitions());
+    setRecords(storage.getAssetRecords());
+  }, [workspaceRevision]);
 
   const selectedType = useMemo(
     () => definitions.find((item) => item.id === selectedTypeId) || definitions[0],

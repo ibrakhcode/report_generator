@@ -61,8 +61,8 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   const [deskFilter, setDeskFilter] = useState<'assigned' | 'unassigned' | 'month'>('assigned');
   const [laneFilter, setLaneFilter] = useState<'open' | 'closed' | 'all'>('open');
   const [focusId, setFocusId] = useState<string | null>(null);
-  const departments = storage.getDepartmentNames();
-  const devices = storage.getDeviceNames();
+  const [departments, setDepartments] = useState(() => storage.getDepartmentNames());
+  const [devices, setDevices] = useState(() => storage.getDeviceNames());
   const defaultDepartment = departments[0] || '';
 
   const syncAssignedTickets = useCallback(async (silent = false) => {
@@ -97,6 +97,8 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
 
   useEffect(() => {
     setTickets(storage.getTickets());
+    setDepartments(storage.getDepartmentNames());
+    setDevices(storage.getDeviceNames());
   }, [workspaceRevision, selectedMonth]);
 
   useEffect(() => {

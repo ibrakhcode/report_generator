@@ -6,7 +6,9 @@ import {
   CheckCircle,
   Edit3,
   Save,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  X
 } from 'lucide-react';
 import { MonthlyReportData } from '../../types';
 import { storage } from '../../services/storage';
@@ -30,7 +32,7 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
   const [report, setReport] = useState<MonthlyReportData>(() =>
     storage.getDeliveryReport(selectedMonth)
   );
-  const [activeTab, setActiveTab] = useState<'preview' | 'edit' | 'versions'>('preview');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const templates = storage.getTemplates();
   const [selectedTemplateId, setSelectedTemplateId] = useState(
@@ -82,7 +84,7 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
   };
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto space-y-6">
+    <div className="h-full min-h-0 flex flex-col gap-3">
       {/* Action Header Banner */}
       <div className="bg-gradient-to-r from-blue-900 via-slate-800 to-indigo-950 border border-blue-800/50 rounded-2xl p-6 sm:p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-6 shadow-2xl">
         <div className="space-y-1.5 max-w-2xl">
@@ -123,6 +125,18 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
 
         <div className="flex flex-wrap items-center gap-2.5">
           <button
+            type="button"
+            onClick={() => {
+              const next = storage.getDeliveryReport(selectedMonth);
+              setReport({ ...next, selectedTemplateId: selectedTemplateId || next.selectedTemplateId });
+              setPreviewOpen(true);
+            }}
+            className="px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-lg shadow-blue-600/20 flex items-center gap-2"
+          >
+            <Eye className="w-4 h-4" />
+            <span>Report Preview</span>
+          </button>
+          <button
             onClick={() => {
               storage.saveReport({ ...report, selectedTemplateId });
               sessionStorage.setItem('hesu_selected_template_id', selectedTemplateId);
@@ -155,30 +169,12 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
         </div>
       </div>
 
-      {/* Tabs navigation */}
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveTab('preview')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
-              activeTab === 'preview'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            Report Preview & Deck Slides
-          </button>
-          <button
-            onClick={() => setActiveTab('edit')}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 ${
-              activeTab === 'edit'
-                ? 'bg-blue-600 text-white shadow'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
+          <span className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 text-white shadow flex items-center gap-1.5">
             <Edit3 className="w-3.5 h-3.5" />
             <span>Edit Narrative Sections</span>
-          </button>
+          </span>
         </div>
 
         <button
@@ -191,14 +187,7 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
         </button>
       </div>
 
-      {activeTab === 'preview' && (
-        <div className="space-y-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 sm:p-6">
-          <ReportDocumentPreview report={report} template={resolveTemplate(selectedTemplateId)} />
-        </div>
-      )}
-
-      {/* Mode 2: Live Narrative Text Editor */}
-      {activeTab === 'edit' && (
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-6">
         <form onSubmit={handleSaveReportEdits} className="space-y-6">
           <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-700">
@@ -285,7 +274,29 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({
             </div>
           </div>
         </form>
-      )}
+      </div>
+
+      {previewOpen ? (
+        <div className="fixed inset-0 z-[80] bg-slate-950/90 backdrop-blur-sm flex flex-col">
+          <div className="shrink-0 flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-800 bg-slate-900">
+            <p className="text-sm font-bold text-white">Report Preview — {selectedMonth}</p>
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(false)}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 inline-flex items-center gap-1.5"
+            >
+              <X className="w-4 h-4" />
+              Close
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6">
+            <ReportDocumentPreview
+              report={storage.getDeliveryReport(selectedMonth)}
+              template={resolveTemplate(selectedTemplateId)}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

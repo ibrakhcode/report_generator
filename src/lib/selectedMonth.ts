@@ -34,7 +34,18 @@ export function defaultDateForMonth(yearMonth: string) {
 }
 
 export function inYearMonth(dateValue: string | undefined, yearMonth: string) {
-  return Boolean(dateValue && dateValue.startsWith(yearMonth));
+  const raw = String(dateValue || '').trim();
+  if (!raw || !isYearMonth(yearMonth)) return false;
+  if (raw.startsWith(yearMonth)) return true;
+  const isoDay = dateOrYearMonth(raw);
+  return isoDay === yearMonth || isoDay.startsWith(yearMonth);
+}
+
+function dateOrYearMonth(value: string) {
+  if (/^\d{4}-\d{2}/.test(value)) return value.slice(0, 7);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export function projectSpansMonth(
