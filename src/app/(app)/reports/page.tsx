@@ -11,11 +11,6 @@ const MonthlyReportsView = dynamic(
 );
 
 export default function ReportsPage() {
-  const { selectedMonth, selectModule } = useAppSession();
-  return (
-    <MonthlyReportsView
-      selectedMonth={selectedMonth}
-      onNavigateToShare={() => selectModule('sharing')}
-    />
-  );
+  const { selectedMonth } = useAppSession();
+  return <MonthlyReportsView selectedMonth={selectedMonth} />;
 }

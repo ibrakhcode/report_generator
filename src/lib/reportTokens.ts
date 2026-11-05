@@ -1,4 +1,5 @@
 import { MonthlyReportData } from '@/types';
+import { fillItSupportSlideXml, isItSupportTemplateXml } from '@/lib/itSupportPptxFill';
 
 export const REPORT_PLACEHOLDERS = [
   'COMPANY_NAME',
@@ -114,7 +115,6 @@ const LIVE_SLIDE_PLAN: { heading: string; body: (keyof ReturnType<typeof buildRe
   { heading: 'Daily Work', body: ['DAILY_WORK', 'ACTIVITY_COUNT'] },
   { heading: 'IT Support Tickets', body: ['TICKETS', 'TICKET_COUNT', 'SLA_PERCENT'] },
   { heading: 'Projects', body: ['PROJECTS', 'PROJECT_COUNT'] },
-  { heading: 'KPIs', body: ['KPIS', 'KPI_SCORE'] },
   { heading: 'Staff Training', body: ['TRAINING'] },
   { heading: 'Achievements', body: ['ACHIEVEMENTS'] },
   { heading: 'Outstanding Issues', body: ['ISSUES'] },
@@ -208,6 +208,20 @@ export async function fillPptxTemplate(dataUrl: string, report: MonthlyReportDat
     if (!/\.(xml|rels)$/i.test(name)) continue;
     const xml = await zip.files[name].async('string');
     zip.file(name, replacePlaceholdersInXml(xml, tokens));
+  }
+  const sample = await Promise.all(slides.map(async (name) => (await zip.file(name)?.async('string')) || ''));
+  if (sample.some((xml) => isItSupportTemplateXml(xml))) {
+    for (let index = 0; index < slides.length; index += 1) {
+      const name = slides[index];
+      const file = zip.file(name);
+      if (!file) continue;
+      const xml = await file.async('string');
+      zip.file(name, fillItSupportSlideXml(xml, report, index + 1));
+    }
+    return zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    });
   }
   const plans = buildLiveSlidePlans(report, slides.length);
   for (let index = 0; index < slides.length; index += 1) {

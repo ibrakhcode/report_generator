@@ -229,6 +229,39 @@ export function mapExternalTicket(raw: Json): SupportTicket | null {
   return ticket;
 }
 
+export function activityFromClosedTicket(ticket: SupportTicket): DailyActivity {
+  const date = (ticket.resolvedAt || ticket.reportedAt || ticket.createdAt || new Date().toISOString()).slice(0, 10);
+  const now = new Date().toISOString();
+  const workId = ticket.id.startsWith(TICKET_EXT_PREFIX)
+    ? ticket.relatedActivityId || `${ACTIVITY_EXT_PREFIX}${ticket.id.replace(TICKET_EXT_PREFIX, '')}`
+    : `ACT-TCK-${ticket.id}`;
+  return {
+    id: workId,
+    date,
+    title: ticket.title,
+    description: ticket.description,
+    category: 'User Support',
+    department: ticket.department,
+    systemOrDevice: ticket.applicationOrDevice,
+    priority: ticket.priority,
+    startTime: '08:30',
+    endTime: '17:00',
+    hoursSpent: ticket.resolutionHours || 0.5,
+    status: 'Completed',
+    actionTaken: ticket.actionsTaken || `Closed ticket ${ticket.id}.`,
+    resultOutcome: ticket.resolution || 'Ticket closed and recorded as daily work.',
+    businessImpact: 'Support request completed for the requesting unit.',
+    relatedKpiId: '',
+    relatedTicketId: ticket.id,
+    evidenceLinks: ticket.escalationNotes ? [ticket.escalationNotes] : [],
+    evidenceFiles: ticket.evidenceFiles || [],
+    lessonsLearned: ticket.rootCause || '',
+    createdBy: ticket.assignedTechnician,
+    createdAt: ticket.createdAt || now,
+    updatedAt: now
+  };
+}
+
 export function activityForExternalTicket(ticket: SupportTicket): DailyActivity {
   const date = (ticket.reportedAt || ticket.createdAt || new Date().toISOString()).slice(0, 10);
   const now = new Date().toISOString();

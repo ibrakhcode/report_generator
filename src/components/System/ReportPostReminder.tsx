@@ -2,24 +2,18 @@
 
 import { useEffect, useRef } from 'react';
 import { notify } from '@/lib/systemNotify';
-import {
-  monthLabel,
-  previousYearMonth,
-  shouldRemindReportPost,
-  unpostedReportSources
-} from '@/lib/reportPosts';
+import { monthLabel, unpostedReportSources } from '@/lib/reportPosts';
 import { useAppSession } from '@/context/AppSessionContext';
 
 const KEY = 'hesu_report_post_reminded';
 
 export function ReportPostReminder() {
-  const { ready, currentUser } = useAppSession();
+  const { ready, currentUser, selectedMonth } = useAppSession();
   const sent = useRef(false);
 
   useEffect(() => {
     if (!ready || !currentUser || sent.current) return;
-    if (!shouldRemindReportPost()) return;
-    const month = previousYearMonth();
+    const month = selectedMonth;
     const missing = unpostedReportSources(month);
     if (!missing.length) return;
     const dayKey = `${KEY}-${month}-${new Date().toISOString().slice(0, 10)}`;
@@ -30,7 +24,7 @@ export function ReportPostReminder() {
       `Post ${monthLabel(month)} report sources`,
       missing.map((item) => `${item.label}: ${item.missing} not posted`).join(' · ')
     );
-  }, [ready, currentUser]);
+  }, [ready, currentUser, selectedMonth]);
 
   return null;
 }

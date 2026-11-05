@@ -89,7 +89,7 @@ export function TemplateLiveMode({
             </h3>
             <p className="text-[11px] text-slate-400 mt-1">
               Attached file design stays. Original wording is removed. Headings and numbers come from Daily Work,
-              Helpdesk, Projects, KPIs, and Training for {month}.
+              Helpdesk, Projects, and Training for {month}.
             </p>
           </div>
           <div className="flex items-center gap-2">

@@ -157,7 +157,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
       setFormData({
         ...formData,
         allowedModules: withoutKpisIfOfficer(
-          ['dashboard', 'kpis', 'reports', 'report-library', 'sharing'],
+          ['dashboard', 'kpis', 'reports', 'report-library'],
           formData.role
         )
       });
@@ -174,7 +174,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({ currentU
     } else if (preset === 'reports') {
       setTargetModules(
         withoutKpisIfOfficer(
-          ['dashboard', 'kpis', 'reports', 'report-library', 'sharing'],
+          ['dashboard', 'kpis', 'reports', 'report-library'],
           selectedUserForPerms?.role
         )
       );

@@ -1,7 +1,5 @@
-'use client';
-
-import { TemplateDesignerView } from '@/components/Modules/TemplateDesignerView';
+import { redirect } from 'next/navigation';
 
 export default function TemplatesPage() {
-  return <TemplateDesignerView />;
+  redirect('/reports');
 }

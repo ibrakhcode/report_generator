@@ -41,6 +41,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       router.replace('/dashboard');
       return;
     }
+    if (pathname === '/templates' || pathname === '/sharing') {
+      router.replace('/reports');
+      return;
+    }
     const moduleId = pathToModuleId(pathname);
     const allowed = allowedModuleIds(currentUser);
     if (!allowed.includes(moduleId)) {

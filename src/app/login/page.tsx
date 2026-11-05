@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LoginView } from '@/components/Auth/LoginView';
 import { storage } from '@/services/storage';
+import { auth } from '@/services/auth';
 import { useAppSession } from '@/context/AppSessionContext';
 
 export default function LoginPage() {
@@ -23,7 +24,7 @@ export default function LoginPage() {
     <LoginView
       onSuccess={() => {
         refreshSession();
-        if (storage.isCompanyRegistered()) {
+        if (storage.isCompanyRegistered(auth.getCurrentUser())) {
           router.push('/dashboard');
         } else {
           router.push('/setup/company');

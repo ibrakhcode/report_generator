@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Sliders, Save, CheckCircle2, Shield, Globe, Mail, Palette, Type, LifeBuoy } from 'lucide-react';
 import { AppSettings, UiFont, UiTheme } from '../../types';
 import { storage } from '../../services/storage';
@@ -10,6 +11,8 @@ import { SuggestField } from '@/components/System/SuggestField';
 import { auth } from '@/services/auth';
 
 export const SettingsView: React.FC = () => {
+  const searchParams = useSearchParams();
+  const microsoftStatus = searchParams.get('microsoft');
   const [settings, setSettings] = useState<AppSettings>(() => storage.getSettings());
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -269,6 +272,34 @@ export const SettingsView: React.FC = () => {
             <span>Outbound Email Integration</span>
           </h3>
 
+          <p className="text-xs text-slate-400">
+            Use Microsoft Graph for one-click send (works when SMTP AUTH is disabled). Connect once, then Delivery can send with attachments.
+          </p>
+          {microsoftStatus === 'connected' ? (
+            <p className="text-xs text-teal-300">Microsoft mailbox connected. Save Settings, then send from Delivery.</p>
+          ) : null}
+          {microsoftStatus === 'missing' ? (
+            <p className="text-xs text-amber-300">Set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET in the server environment first.</p>
+          ) : null}
+          {microsoftStatus === 'error' || microsoftStatus === 'state' ? (
+            <p className="text-xs text-rose-300">Microsoft sign-in did not finish. Try Connect Microsoft again.</p>
+          ) : null}
+          <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-white">Microsoft Graph</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {settings.emailService.microsoftAccountEmail
+                  ? `Connected as ${settings.emailService.microsoftAccountEmail}`
+                  : 'Not connected yet'}
+              </p>
+            </div>
+            <a
+              href="/api/auth/microsoft/start"
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold text-center"
+            >
+              Connect Microsoft
+            </a>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <SuggestField
@@ -281,7 +312,7 @@ export const SettingsView: React.FC = () => {
                   })
                 }
                 options={[
-                  { value: 'Simulation', label: 'Built-in Dispatch Simulator' },
+                  { value: 'MicrosoftGraph', label: 'Microsoft Graph (Outlook)' },
                   { value: 'SMTP', label: 'Corporate SMTP (hesu.co.tz)' },
                   { value: 'Resend', label: 'Resend API' },
                   { value: 'SendGrid', label: 'SendGrid' }
@@ -289,7 +320,58 @@ export const SettingsView: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-slate-400 font-semibold mb-1">Sender Email</label>
+              <label className="block text-slate-400 font-semibold mb-1">SMTP host</label>
+              <input
+                type="text"
+                value={settings.emailService.host || ''}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  emailService: { ...settings.emailService, host: e.target.value }
+                })}
+                placeholder="mail.hesu.co.tz"
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1">SMTP port</label>
+              <input
+                type="number"
+                value={settings.emailService.port || 465}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  emailService: { ...settings.emailService, port: parseInt(e.target.value, 10) || 465 }
+                })}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1">SMTP username</label>
+              <input
+                type="text"
+                value={settings.emailService.smtpUser || ''}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  emailService: { ...settings.emailService, smtpUser: e.target.value }
+                })}
+                placeholder="helpdesk@hesu.co.tz"
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1">From name</label>
+              <input
+                type="text"
+                value={settings.emailService.fromName}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  emailService: { ...settings.emailService, fromName: e.target.value }
+                })}
+                placeholder="ICT Department"
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1">From email</label>
               <input
                 type="email"
                 value={settings.emailService.fromEmail}
@@ -297,13 +379,27 @@ export const SettingsView: React.FC = () => {
                   ...settings,
                   emailService: { ...settings.emailService, fromEmail: e.target.value }
                 })}
+                placeholder="helpdesk@hesu.co.tz"
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-slate-400 font-semibold mb-1">Delivery recipient (boss default)</label>
+              <input
+                type="email"
+                value={settings.emailService.recipientEmail || ''}
+                onChange={(e) => setSettings({
+                  ...settings,
+                  emailService: { ...settings.emailService, recipientEmail: e.target.value }
+                })}
+                placeholder="imsambwe@hesu.co.tz"
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-slate-400 font-semibold mb-1">API Key / SMTP Password (Masked)</label>
+            <label className="block text-slate-400 font-semibold mb-1">SMTP password</label>
             <input
               type="password"
               value={settings.emailService.apiKeyOrPass}
@@ -311,7 +407,7 @@ export const SettingsView: React.FC = () => {
                 ...settings,
                 emailService: { ...settings.emailService, apiKeyOrPass: e.target.value }
               })}
-              placeholder="••••••••••••••••••••"
+              placeholder="Same password as Help Desk SMTP"
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-mono focus:outline-none"
             />
           </div>

@@ -57,6 +57,7 @@ const SETTINGS_FALLBACK: AppSettings = {
     provider: 'Simulation',
     fromEmail: '',
     fromName: 'ICT Department',
+    recipientEmail: '',
     apiKeyOrPass: '',
     configured: false
   },
@@ -270,7 +271,9 @@ export async function readWorkspace(supabase: SupabaseClient, session: RmsSessio
     settings: settings.data
       ? rowToSettings(settings.data as Record<string, unknown>, SETTINGS_FALLBACK)
       : null,
-    reportPosts: postsMissing ? [] : (reportPosts.data || []).map((row) => rowToReportPost(row as Record<string, unknown>))
+    reportPosts: postsMissing
+      ? undefined
+      : (reportPosts.data || []).map((row) => rowToReportPost(row as Record<string, unknown>))
   };
 }
 

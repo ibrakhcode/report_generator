@@ -60,14 +60,11 @@ export function IctMonthlyPptxPreview({ report }: { report: MonthlyReportData })
   const settings = storage.getSettings();
   const company = (report.companyName || settings.companyName || 'HESU INVESTMENT LIMITED').toUpperCase();
   const period = periodLabel(report.month, report.reportingPeriod);
-  const activities = report.activitiesSummary.topActivities || [];
-  const tickets = report.ticketsSummary.tickets || [];
   const projects = report.projectsSummary.projects || [];
-  const kpis = report.kpisSummary.kpis || [];
   const email = settings.emailService.fromEmail || report.employeeEmail;
 
   const metrics = [
-    { label: 'KPI score', value: `${report.kpisSummary.averageAchievement}%`, color: TEAL },
+    { label: 'Hours', value: `${report.activitiesSummary.totalHours}`, color: TEAL },
     { label: 'Activities', value: `${report.activitiesSummary.completed}`, color: '#3B82F6' },
     { label: 'SLA', value: `${report.ticketsSummary.slaCompliancePercent}%`, color: ORANGE },
     { label: 'Projects', value: `${projects.length}`, color: '#22C55E' }
@@ -76,7 +73,7 @@ export function IctMonthlyPptxPreview({ report }: { report: MonthlyReportData })
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-8">
       <p className="text-[11px] text-cyan-300">
-        Default look: ICT_Monthly_Report_2026.pptx. Live names and numbers come from this month&apos;s records.
+        Default look: IT Support Monthly Report Template. Live names and numbers come from this month&apos;s records.
       </p>
 
       <Slide className="text-white">
@@ -154,53 +151,19 @@ export function IctMonthlyPptxPreview({ report }: { report: MonthlyReportData })
       </Slide>
 
       <WhiteSlide kicker="ICT MONTHLY PERFORMANCE" title="2. Daily Work this period">
-        <Table
-          headers={['Date', 'Activity', 'Department', 'Status', 'Hours']}
-          rows={
-            activities.length
-              ? activities.map((item) => [item.date, item.title, item.department, item.status, `${item.hoursSpent}h`])
-              : [['—', 'No daily work recorded for this period', '—', '—', '—']]
-          }
-        />
+        <p className="text-sm leading-relaxed text-slate-700">{report.majorAchievements}</p>
       </WhiteSlide>
 
       <WhiteSlide kicker="ICT MONTHLY PERFORMANCE" title="3. Helpdesk tickets">
-        <Table
-          headers={['ID', 'Ticket', 'Department', 'Status', 'Priority']}
-          rows={
-            tickets.length
-              ? tickets.map((item) => [item.id, item.title, item.department, item.status, item.priority])
-              : [['—', 'No tickets recorded for this period', '—', '—', '—']]
-          }
-        />
+        <p className="text-sm leading-relaxed text-slate-700">{report.outstandingIssues}</p>
       </WhiteSlide>
 
-      <WhiteSlide kicker="ICT MONTHLY PERFORMANCE" title="4. Projects and assigned performers">
-        <Table
-          headers={['Project', 'Assigned to', 'Status', 'Progress']}
-          rows={
-            projects.length
-              ? projects.map((item) => [item.name, item.assignedUserName || item.owner, item.status, `${item.progressPercent}%`])
-              : [['No projects recorded', '—', '—', '—']]
-          }
-        />
+      <WhiteSlide kicker="ICT MONTHLY PERFORMANCE" title="4. Projects">
+        <p className="text-sm leading-relaxed text-slate-700">{report.challengesAndRisks}</p>
       </WhiteSlide>
 
-      <WhiteSlide kicker="ICT MONTHLY PERFORMANCE" title="5. KPI performance">
-        <Table
-          headers={['Metric', 'Target', 'Actual', 'Weight', 'Achievement']}
-          rows={
-            kpis.length
-              ? kpis.map((item) => [
-                  item.name,
-                  `${item.targetValue} ${item.unit}`,
-                  `${item.actualValue} ${item.unit}`,
-                  `${item.weightPercent}%`,
-                  `${item.achievementPercent}%`
-                ])
-              : [['No KPIs recorded', '—', '—', '—', '—']]
-          }
-        />
+      <WhiteSlide kicker="ICT MONTHLY PERFORMANCE" title="5. Training">
+        <p className="text-sm leading-relaxed text-slate-700">{report.nextMonthPriorities}</p>
       </WhiteSlide>
     </div>
   );
@@ -228,29 +191,3 @@ function MetaRow({
   );
 }
 
-function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
-  return (
-    <table className="w-full text-left text-[11px]">
-      <thead>
-        <tr style={{ backgroundColor: NAVY, color: '#fff' }}>
-          {headers.map((h) => (
-            <th key={h} className="py-2 px-2 font-semibold">
-              {h}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, i) => (
-          <tr key={`${row[0]}-${i}`} className="border-b border-slate-200">
-            {row.map((cell, j) => (
-              <td key={`${i}-${j}`} className="py-2 px-2">
-                {cell}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}

@@ -232,10 +232,10 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
 
   // 4 Metric Highlight Cards
   const cardData = [
-    { title: 'KPI weighted score', value: `${report.kpisSummary.averageAchievement}%`, note: `${report.kpisSummary.kpis.length} KPI measure(s)`, color: '0284C7' },
+    { title: 'Daily work hours', value: `${report.activitiesSummary.totalHours}`, note: `${report.activitiesSummary.total} posted work item(s)`, color: '0284C7' },
     { title: 'Total Activities Completed', value: `${report.activitiesSummary.completed}`, note: `${report.activitiesSummary.totalHours} productive hours logged`, color: '16A34A' },
     { title: 'Ticket SLA Compliance', value: `${report.ticketsSummary.slaCompliancePercent}%`, note: `Avg resolution ${report.ticketsSummary.avgResolutionHours} hrs`, color: 'D97706' },
-    { title: 'Weighted KPI Score', value: `${report.kpisSummary.averageAchievement}%`, note: `Across ${report.kpisSummary.kpis.length} strategic indicators`, color: '2563EB' }
+    { title: 'Projects', value: `${report.projectsSummary.projects.length}`, note: `${report.projectsSummary.activeCount} active initiative(s)`, color: '2563EB' }
   ];
 
   cardData.forEach((c, idx) => {
@@ -282,196 +282,54 @@ async function buildDesignedPptx(report: MonthlyReportData, template: ReportTemp
     });
   });
 
-  // 3. SLIDE: KEY PERFORMANCE INDICATORS (KPIs)
   const slideKpis = pptx.addSlide();
-  addHeaderFooter(slideKpis, '2. Key Performance Indicators (KPIs) Achievement Matrix');
-
-  const kpiRows: PptxGenJS.TableRow[] = [
-    [
-      { text: 'KPI ID & Performance Objective', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
-      { text: 'Target', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Actual', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Weight', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Achievement', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Self-Assessment & Verification', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
-      { text: 'Status', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } }
-    ]
-  ];
-
-  report.kpisSummary.kpis.forEach((k, idx) => {
-    const isEven = idx % 2 === 0;
-    const rowBg = isEven ? WHITE : 'F1F5F9';
-    kpiRows.push([
-      { text: `${k.name}\n${k.objective}`, options: { fontSize: 9, fill: { color: rowBg }, color: TEXT_DARK } },
-      { text: `${k.targetValue} ${k.unit}`, options: { fontSize: 9, fill: { color: rowBg }, align: 'center', bold: true } },
-      { text: `${k.actualValue} ${k.unit}`, options: { fontSize: 9, fill: { color: rowBg }, align: 'center', bold: true } },
-      { text: `${k.weightPercent}%`, options: { fontSize: 9, fill: { color: rowBg }, align: 'center' } },
-      { text: `${k.achievementPercent}%`, options: { fontSize: 10, fill: { color: rowBg }, align: 'center', bold: true, color: '16A34A' } },
-      { text: k.selfAssessment, options: { fontSize: 8.5, fill: { color: rowBg }, color: TEXT_MUTED } },
-      { text: k.status, options: { fontSize: 9, fill: { color: rowBg }, align: 'center', bold: true } }
-    ]);
-  });
-
-  slideKpis.addTable(kpiRows, {
+  addHeaderFooter(slideKpis, '2. Operational follow-up');
+  slideKpis.addText(report.recommendations, {
     x: 0.8,
-    y: 1.2,
+    y: 1.3,
     w: 11.7,
-    colW: [3.2, 1.0, 1.0, 0.9, 1.2, 3.2, 1.2],
-    border: { color: BORDER_COLOR, pt: 0.5 }
+    h: 5.2,
+    fontSize: 16,
+    color: TEXT_DARK,
+    fontFace: 'Arial'
   });
 
-  // 4. SLIDE: COMPLETED DAILY ACTIVITIES REGISTER
   const slideActivities = pptx.addSlide();
-  addHeaderFooter(slideActivities, '3. Selected High-Impact Completed Activities');
-
-  const actRows: PptxGenJS.TableRow[] = [
-    [
-      { text: 'Date', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Activity Title & Scope', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
-      { text: 'Category', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
-      { text: 'Department', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
-      { text: 'Hours', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Business Impact & Result', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } }
-    ]
-  ];
-
-  report.activitiesSummary.topActivities.slice(0, 12).forEach((a, idx) => {
-    const isEven = idx % 2 === 0;
-    const rowBg = isEven ? WHITE : 'F1F5F9';
-    actRows.push([
-      { text: a.date, options: { fontSize: 9, fill: { color: rowBg }, align: 'center' } },
-      { text: `${a.title}\n${a.actionTaken}`, options: { fontSize: 9, fill: { color: rowBg }, bold: true } },
-      { text: a.category, options: { fontSize: 8.5, fill: { color: rowBg } } },
-      { text: a.department, options: { fontSize: 8.5, fill: { color: rowBg } } },
-      { text: `${a.hoursSpent}h`, options: { fontSize: 9, fill: { color: rowBg }, align: 'center', bold: true } },
-      { text: a.businessImpact, options: { fontSize: 8.5, fill: { color: rowBg } } }
-    ]);
-  });
-
-  slideActivities.addTable(actRows, {
+  addHeaderFooter(slideActivities, '3. Daily Work');
+  slideActivities.addText(report.majorAchievements, {
     x: 0.8,
-    y: 1.2,
+    y: 1.3,
     w: 11.7,
-    colW: [1.2, 4.0, 1.8, 1.5, 0.9, 2.3],
-    border: { color: BORDER_COLOR, pt: 0.5 }
+    h: 5.2,
+    fontSize: 16,
+    color: TEXT_DARK,
+    fontFace: 'Arial'
   });
 
   // 5. SLIDE: IT SUPPORT TICKETS & SLA PERFORMANCE
   const slideTickets = pptx.addSlide();
   addHeaderFooter(slideTickets, '4. IT Support Service Desk & Ticket Analysis');
 
-  slideTickets.addText(
-    `Total tickets handled: ${report.ticketsSummary.closed + report.ticketsSummary.opened} | Closed: ${report.ticketsSummary.closed} | Open: ${report.ticketsSummary.opened} | SLA Compliance: ${report.ticketsSummary.slaCompliancePercent}%`,
-    {
-      x: 0.8,
-      y: 1.1,
-      w: 11.7,
-      h: 0.4,
-      fontSize: 12,
-      bold: true,
-      color: NAVY,
-      fontFace: 'Arial'
-    }
-  );
-
-  // Category breakdown table
-  const ticketRows: PptxGenJS.TableRow[] = [
-    [
-      { text: 'Ticket Category', options: { bold: true, fill: { color: BLUE }, color: WHITE, fontSize: 10 } },
-      { text: 'Incidents Logged', options: { bold: true, fill: { color: BLUE }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Percentage Share', options: { bold: true, fill: { color: BLUE }, color: WHITE, fontSize: 10, align: 'center' } }
-    ]
-  ];
-
-  const totalCatTickets = Object.values(report.ticketsSummary.byCategory).reduce((a, b) => a + b, 0) || 1;
-  Object.entries(report.ticketsSummary.byCategory).forEach(([cat, count], idx) => {
-    const isEven = idx % 2 === 0;
-    const rowBg = isEven ? WHITE : 'F1F5F9';
-    ticketRows.push([
-      { text: cat, options: { fontSize: 9.5, fill: { color: rowBg } } },
-      { text: `${count}`, options: { fontSize: 9.5, fill: { color: rowBg }, align: 'center', bold: true } },
-      { text: `${Math.round((count / totalCatTickets) * 100)}%`, options: { fontSize: 9.5, fill: { color: rowBg }, align: 'center' } }
-    ]);
-  });
-
-  slideTickets.addTable(ticketRows, {
+  slideTickets.addText(report.outstandingIssues, {
     x: 0.8,
-    y: 1.6,
-    w: 5.5,
-    colW: [2.5, 1.5, 1.5],
-    border: { color: BORDER_COLOR, pt: 0.5 }
-  });
-
-  // Strategic Ticket Notes on the Right Side
-  slideTickets.addShape(pptx.ShapeType.roundRect, {
-    x: 6.8,
-    y: 1.6,
-    w: 5.7,
-    h: 4.8,
-    fill: { color: WHITE },
-    line: { color: BORDER_COLOR, width: 1 }
-  });
-
-  slideTickets.addText('Service Desk Key Findings & SLA Controls', {
-    x: 7.1,
-    y: 1.8,
-    w: 5.1,
-    h: 0.4,
-    fontSize: 12,
-    bold: true,
-    color: NAVY,
+    y: 1.3,
+    w: 11.7,
+    h: 5.2,
+    fontSize: 16,
+    color: TEXT_DARK,
     fontFace: 'Arial'
   });
 
-  const liveTickets = report.ticketsSummary.tickets || [];
-  const ticketBullets = liveTickets.length
-    ? liveTickets.slice(0, 6).map((item) => `${item.title} — ${item.status} (${item.department})`)
-    : ['No support tickets recorded for this period.'];
-
-  slideTickets.addText(
-    ticketBullets.map((b) => ({ text: `• ${b}\n\n`, options: { fontSize: 10, color: TEXT_DARK } })),
-    {
-      x: 7.1,
-      y: 2.4,
-      w: 5.1,
-      h: 3.8,
-      fontFace: 'Arial'
-    }
-  );
-
   const slideProjects = pptx.addSlide();
-  addHeaderFooter(slideProjects, '5. Projects & Assigned Performers');
-  const projectRows: PptxGenJS.TableRow[] = [
-    [
-      { text: 'Project', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
-      { text: 'Assigned to', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10 } },
-      { text: 'Status', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } },
-      { text: 'Progress', options: { bold: true, fill: { color: NAVY }, color: WHITE, fontSize: 10, align: 'center' } }
-    ]
-  ];
-  (report.projectsSummary.projects || []).slice(0, 10).forEach((project, idx) => {
-    const rowBg = idx % 2 === 0 ? WHITE : 'F1F5F9';
-    projectRows.push([
-      { text: project.name, options: { fontSize: 9, fill: { color: rowBg }, bold: true } },
-      { text: project.assignedUserName || project.owner, options: { fontSize: 9, fill: { color: rowBg } } },
-      { text: project.status, options: { fontSize: 9, fill: { color: rowBg }, align: 'center' } },
-      { text: `${project.progressPercent}%`, options: { fontSize: 9, fill: { color: rowBg }, align: 'center' } }
-    ]);
-  });
-  if ((report.projectsSummary.projects || []).length === 0) {
-    projectRows.push([
-      { text: 'No projects recorded for the selected company.', options: { fontSize: 10, fill: { color: WHITE } } },
-      { text: '', options: { fill: { color: WHITE } } },
-      { text: '', options: { fill: { color: WHITE } } },
-      { text: '', options: { fill: { color: WHITE } } }
-    ]);
-  }
-  slideProjects.addTable(projectRows, {
+  addHeaderFooter(slideProjects, '5. Projects');
+  slideProjects.addText(report.challengesAndRisks, {
     x: 0.8,
-    y: 1.2,
+    y: 1.3,
     w: 11.7,
-    colW: [5.2, 3.2, 1.8, 1.5],
-    border: { color: BORDER_COLOR, pt: 0.5 }
+    h: 5.2,
+    fontSize: 16,
+    color: TEXT_DARK,
+    fontFace: 'Arial'
   });
 
   // 6. SLIDE: MAJOR ACHIEVEMENTS, RISKS & NEXT PRIORITIES

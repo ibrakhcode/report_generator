@@ -2,8 +2,8 @@ const DB_NAME = 'hesu_template_files_v1';
 const STORE = 'files';
 
 export const BUNDLED_DEFAULT_TEMPLATE_ID = 'TMPL-ICT-2026';
-export const BUNDLED_DEFAULT_PPTX_NAME = 'ICT_Monthly_Report_2026.pptx';
-export const BUNDLED_DEFAULT_PPTX_PATH = '/templates/ICT_Monthly_Report_2026.pptx';
+export const BUNDLED_DEFAULT_PPTX_NAME = 'IT_Support_Monthly_Report_Template.pptx';
+export const BUNDLED_DEFAULT_PPTX_PATH = '/templates/IT_Support_Monthly_Report_Template.pptx';
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {

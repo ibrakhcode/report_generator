@@ -7,9 +7,7 @@ export const REPORT_POST_SOURCES: { id: ReportPostSource; label: string }[] = [
   { id: 'tickets', label: 'Tickets' },
   { id: 'activities', label: 'Daily work' },
   { id: 'projects', label: 'Projects' },
-  { id: 'kpis', label: 'KPIs' },
-  { id: 'training', label: 'Training' },
-  { id: 'sap', label: 'SAP issues' }
+  { id: 'training', label: 'Training' }
 ];
 
 export function previousYearMonth(from = new Date()) {
@@ -50,7 +48,7 @@ export function recordIdsForSource(source: ReportPostSource, yearMonth: string):
   if (source === 'projects') {
     return storage.getProjects().filter((project) => projectSpansMonth(project, yearMonth)).map((item) => item.id);
   }
-  if (source === 'kpis') return storage.getKpis().map((item) => item.id);
+  if (source === 'kpis') return [];
   if (source === 'training') {
     return storage.getTraining().filter((item) => inYearMonth(item.date, yearMonth)).map((item) => item.id);
   }
@@ -73,6 +71,10 @@ export function sourcePostStatus(yearMonth: string) {
 
 export function unpostedReportSources(yearMonth: string) {
   return sourcePostStatus(yearMonth).filter((item) => item.missing > 0);
+}
+
+export function remainingUnpostedCount(yearMonth: string) {
+  return sourcePostStatus(yearMonth).reduce((sum, item) => sum + item.missing, 0);
 }
 
 export function ticketMonthRecap(yearMonth: string) {

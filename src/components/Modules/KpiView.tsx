@@ -36,9 +36,7 @@ import { notify } from '@/lib/systemNotify';
 import { SuggestField } from '@/components/System/SuggestField';
 import { usePagedList } from '@/hooks/usePagedList';
 import { PageBar } from '@/components/System/PageBar';
-import { PostToReportButton } from '@/components/System/PostToReportButton';
 import { useAppSession } from '@/context/AppSessionContext';
-import { recordIdsForSource } from '@/lib/reportPosts';
 
 // Month-over-Month historical performance trend data
 const MOM_KPI_TREND_DATA = [
@@ -224,16 +222,6 @@ export const KpiView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              storage.postManyToReport('kpis', recordIdsForSource('kpis', selectedMonth), selectedMonth);
-              notify.success('Posted to report', `KPIs are in the ${selectedMonth} report.`);
-            }}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-teal-600/40 rounded-xl text-xs font-bold text-teal-300"
-          >
-            Post this month
-          </button>
           <button
             onClick={handleOpenCreate}
             className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-blue-600/20 flex items-center gap-1.5"
@@ -433,7 +421,6 @@ export const KpiView: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <PostToReportButton source="kpis" recordId={kpi.id} />
                   <button
                     onClick={() => handleOpenEdit(kpi)}
                     className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"

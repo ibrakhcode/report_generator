@@ -48,7 +48,10 @@ function allowedModuleIds(user: User | null): string[] {
     isImani || user?.role?.toLowerCase() === 'admin' || user?.role?.toLowerCase() === 'administrator'
   );
   const withoutHidden = (ids: string[]) =>
-    ids.filter((id) => id !== 'sap' && id !== 'ai-assistant' && id !== 'evidence');
+    ids.filter(
+      (id) =>
+        id !== 'sap' && id !== 'ai-assistant' && id !== 'evidence' && id !== 'templates' && id !== 'sharing'
+    );
   const forRole = (ids: string[]) => {
     let next = withoutHidden(ids).filter((id) => !ADMIN_ONLY_MODULE_IDS.includes(id) || isAdmin);
     if (!isManagerRole(user)) next = next.filter((id) => !MANAGER_ONLY_MODULE_IDS.includes(id));
@@ -77,7 +80,7 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
   const refreshSession = useCallback(() => {
     storage.ensureCompanyWorkspace();
     setCurrentUser(auth.getCurrentUser());
-    setCompanyRegistered(storage.isCompanyRegistered());
+    setCompanyRegistered(storage.isCompanyRegistered(auth.getCurrentUser()));
     setActiveCompanyIdState(storage.getActiveCompanyId());
   }, []);
 
@@ -85,7 +88,7 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
     const unsubAuth = auth.subscribe((user) => setCurrentUser(user));
     const unsubLock = auth.subscribeLock(setSessionLocked);
     const unsubStorage = storage.subscribe(() => {
-      setCompanyRegistered(storage.isCompanyRegistered());
+      setCompanyRegistered(storage.isCompanyRegistered(auth.getCurrentUser()));
       setActiveCompanyIdState(storage.getActiveCompanyId());
       setWorkspaceRevision((current) => current + 1);
     });
@@ -98,14 +101,18 @@ export function AppSessionProvider({ children }: { children: React.ReactNode }) 
       setReady(true);
       if (!auth.getCurrentUser()) return;
       const hydrate = async () => {
-        await storage.refreshRemoteSources();
+        try {
+          await storage.refreshRemoteSources();
+        } catch {
+          return;
+        }
         if (cancelled) return;
         setSelectedMonthState(readSelectedMonth());
         refreshSession();
       };
       void hydrate();
       timers.id = window.setInterval(() => {
-        void storage.refreshRemoteSources();
+        void storage.refreshRemoteSources().catch(() => undefined);
       }, 60000);
     })();
     return () => {

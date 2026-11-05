@@ -265,6 +265,19 @@ export interface MonthlyReportData {
   finalizedAt?: string;
   finalizedBy?: string;
   selectedTemplateId?: string;
+  feedbackToken?: string;
+  feedbackRecipients?: string[];
+  feedbackUnseen?: number;
+  feedbackComments?: ReportFeedbackComment[];
+}
+
+export interface ReportFeedbackComment {
+  id: string;
+  role: 'boss' | 'ibrahim';
+  author: string;
+  email?: string;
+  body: string;
+  createdAt: string;
 }
 
 export type ReportPostSource = 'tickets' | 'activities' | 'projects' | 'kpis' | 'training' | 'sap';
@@ -364,9 +377,15 @@ export interface AppSettings {
   idleTimeoutMinutes: number;
   emailService: {
     enabled: boolean;
-    provider: 'SMTP' | 'Resend' | 'SendGrid' | 'Simulation';
+    provider: 'SMTP' | 'Resend' | 'SendGrid' | 'Simulation' | 'MicrosoftGraph';
+    microsoftRefreshToken?: string;
+    microsoftAccessToken?: string;
+    microsoftExpiresAt?: number;
+    microsoftAccountEmail?: string;
     fromEmail: string;
     fromName: string;
+    smtpUser?: string;
+    recipientEmail?: string;
     apiKeyOrPass: string;
     host?: string;
     port?: number;

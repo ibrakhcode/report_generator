@@ -96,26 +96,6 @@ export const APP_MODULES: AppModule[] = [
     iconColor: 'text-white'
   },
   {
-    id: 'templates',
-    name: 'Report Template Designer',
-    shortName: 'Studio & Templates',
-    category: 'Reporting',
-    description: 'Configure corporate branding, slide dimensions, colors, and upload PPTX',
-    iconName: 'Wrench',
-    gradient: 'from-cyan-400 via-blue-500 to-indigo-700',
-    iconColor: 'text-white'
-  },
-  {
-    id: 'sharing',
-    name: 'Report Delivery',
-    shortName: 'Delivery',
-    category: 'Reporting',
-    description: 'Email report attachments and download PPTX or PDF from live company data',
-    iconName: 'Send',
-    gradient: 'from-emerald-500 via-green-600 to-teal-700',
-    iconColor: 'text-white'
-  },
-  {
     id: 'users',
     name: 'User Management',
     shortName: 'Users & Roles',

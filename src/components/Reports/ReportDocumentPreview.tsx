@@ -253,11 +253,7 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
     return <IctMonthlyPptxPreview report={report} />;
   }
 
-  const activities = report.activitiesSummary.topActivities || [];
-  const tickets = report.ticketsSummary.tickets || [];
   const projects = report.projectsSummary.projects || [];
-  const kpis = report.kpisSummary.kpis || [];
-  const training = report.trainingSummary.sessions || [];
   const accent = template.accentColor || '#1E6091';
   const primary = template.primaryColor || '#0F2D59';
   const generated = isGeneratedStyleTemplate(template);
@@ -312,7 +308,7 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
         <p className="text-sm leading-relaxed whitespace-pre-line">{report.executiveSummary}</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
           {[
-            { label: 'KPI score', value: `${report.kpisSummary.averageAchievement}%` },
+            { label: 'Hours', value: String(report.activitiesSummary.totalHours) },
             { label: 'Closed activities', value: String(report.activitiesSummary.completed) },
             { label: 'SLA compliance', value: `${report.ticketsSummary.slaCompliancePercent}%` },
             { label: 'Projects', value: String(projects.length) }
@@ -345,32 +341,7 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
             2. Daily Work
           </h3>
         )}
-        {activities.length === 0 ? (
-          <p className="text-sm text-slate-500">No daily work recorded for this period.</p>
-        ) : (
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr style={{ backgroundColor: primary, color: '#fff' }}>
-                <th className="py-2 px-2">Date</th>
-                <th className="py-2 px-2">Activity</th>
-                <th className="py-2 px-2">Department</th>
-                <th className="py-2 px-2">Status</th>
-                <th className="py-2 px-2">Hours</th>
-              </tr>
-            </thead>
-            <tbody>
-              {activities.map((item) => (
-                <tr key={item.id} className="border-b border-slate-200">
-                  <td className="py-2 px-2">{item.date}</td>
-                  <td className="py-2 px-2">{item.title}</td>
-                  <td className="py-2 px-2">{item.department}</td>
-                  <td className="py-2 px-2">{item.status}</td>
-                  <td className="py-2 px-2">{item.hoursSpent}h</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <p className="text-sm leading-relaxed">{report.majorAchievements}</p>
       </PageShell>
 
       <PageShell template={template} report={report} pageLabel="Helpdesk Tickets" dark={dark} showIcon={generated}>
@@ -381,32 +352,7 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
             3. Helpdesk Tickets
           </h3>
         )}
-        {tickets.length === 0 ? (
-          <p className="text-sm text-slate-500">No tickets recorded for this period.</p>
-        ) : (
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr style={{ backgroundColor: primary, color: '#fff' }}>
-                <th className="py-2 px-2">ID</th>
-                <th className="py-2 px-2">Ticket</th>
-                <th className="py-2 px-2">Department</th>
-                <th className="py-2 px-2">Status</th>
-                <th className="py-2 px-2">Priority</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.map((item) => (
-                <tr key={item.id} className="border-b border-slate-200">
-                  <td className="py-2 px-2">{item.id}</td>
-                  <td className="py-2 px-2">{item.title}</td>
-                  <td className="py-2 px-2">{item.department}</td>
-                  <td className="py-2 px-2">{item.status}</td>
-                  <td className="py-2 px-2">{item.priority}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <p className="text-sm leading-relaxed">{report.outstandingIssues}</p>
       </PageShell>
 
       <PageShell template={template} report={report} pageLabel="Projects" dark={dark} showIcon={generated}>
@@ -417,70 +363,18 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
             4. Projects
           </h3>
         )}
-        {projects.length === 0 ? (
-          <p className="text-sm text-slate-500">No projects recorded.</p>
-        ) : (
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr style={{ backgroundColor: primary, color: '#fff' }}>
-                <th className="py-2 px-2">Project</th>
-                <th className="py-2 px-2">Assigned to</th>
-                <th className="py-2 px-2">Status</th>
-                <th className="py-2 px-2">Progress</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((item) => (
-                <tr key={item.id} className="border-b border-slate-200">
-                  <td className="py-2 px-2">{item.name}</td>
-                  <td className="py-2 px-2">{item.assignedUserName || item.owner}</td>
-                  <td className="py-2 px-2">{item.status}</td>
-                  <td className="py-2 px-2">{item.progressPercent}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <p className="text-sm leading-relaxed">{report.challengesAndRisks}</p>
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="KPI Matrix" dark={dark} showIcon={generated}>
+      <PageShell template={template} report={report} pageLabel="Follow-up" dark={dark} showIcon={generated}>
         {generated ? (
-          <SectionHeading n="05" title="KPI Performance Matrix" primary={primary} accent={accent} icon={Gauge} />
+          <SectionHeading n="05" title="Operational follow-up" primary={primary} accent={accent} icon={Gauge} />
         ) : (
           <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
-            5. KPI Performance Matrix
+            5. Operational follow-up
           </h3>
         )}
-        {kpis.length === 0 ? (
-          <p className="text-sm text-slate-500">No KPIs recorded.</p>
-        ) : (
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr style={{ backgroundColor: primary, color: '#fff' }}>
-                <th className="py-2 px-2">Metric</th>
-                <th className="py-2 px-2">Target</th>
-                <th className="py-2 px-2">Actual</th>
-                <th className="py-2 px-2">Weight</th>
-                <th className="py-2 px-2">Achievement</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kpis.map((item) => (
-                <tr key={item.id} className="border-b border-slate-200">
-                  <td className="py-2 px-2">{item.name}</td>
-                  <td className="py-2 px-2">
-                    {item.targetValue} {item.unit}
-                  </td>
-                  <td className="py-2 px-2">
-                    {item.actualValue} {item.unit}
-                  </td>
-                  <td className="py-2 px-2">{item.weightPercent}%</td>
-                  <td className="py-2 px-2">{item.achievementPercent}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <p className="text-sm leading-relaxed">{report.recommendations}</p>
       </PageShell>
 
       <PageShell template={template} report={report} pageLabel="Training" dark={dark} showIcon={generated}>
@@ -491,49 +385,18 @@ export const ReportDocumentPreview: React.FC<ReportDocumentPreviewProps> = ({ re
             6. Training
           </h3>
         )}
-        {training.length === 0 ? (
-          <p className="text-sm text-slate-500">No training recorded for this period.</p>
-        ) : (
-          <ul className="space-y-2 text-sm">
-            {training.map((item) => (
-              <li key={item.id}>
-                {item.date} · {item.title} · {item.participantCount} participants
-              </li>
-            ))}
-          </ul>
-        )}
+        <p className="text-sm leading-relaxed">{report.nextMonthPriorities}</p>
       </PageShell>
 
-      <PageShell template={template} report={report} pageLabel="Narrative & Sign-off" dark={dark} showIcon={generated}>
+      <PageShell template={template} report={report} pageLabel="Sign-off" dark={dark} showIcon={generated}>
         <div className="space-y-5 text-sm">
           {generated ? (
-            <SectionHeading n="07" title="Narrative and Sign-off" primary={primary} accent={accent} icon={Award} />
-          ) : null}
-          <section>
-            <h3 className="font-bold mb-1" style={{ color: primary }}>
-              {generated ? 'Major Achievements' : '7. Major Achievements'}
+            <SectionHeading n="07" title="Sign-off" primary={primary} accent={accent} icon={Award} />
+          ) : (
+            <h3 className="text-lg font-bold mb-3" style={{ color: primary }}>
+              7. Sign-off
             </h3>
-            <p className="whitespace-pre-line">{report.majorAchievements}</p>
-          </section>
-          <section>
-            <h3 className="font-bold mb-1" style={{ color: primary }}>
-              8. Outstanding Issues
-            </h3>
-            <p className="whitespace-pre-line">{report.outstandingIssues}</p>
-          </section>
-          <section>
-            <h3 className="font-bold mb-1" style={{ color: primary }}>
-              9. Challenges &amp; Recommendations
-            </h3>
-            <p className="whitespace-pre-line">{report.challengesAndRisks}</p>
-            <p className="whitespace-pre-line mt-2">{report.recommendations}</p>
-          </section>
-          <section>
-            <h3 className="font-bold mb-1" style={{ color: primary }}>
-              10. Next Month&apos;s Priorities
-            </h3>
-            <p className="whitespace-pre-line">{report.nextMonthPriorities}</p>
-          </section>
+          )}
           <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
             <div className="border p-4 min-h-[120px]" style={{ borderColor: accent }}>
               <p className="text-[11px] font-bold">SUBMITTED BY</p>

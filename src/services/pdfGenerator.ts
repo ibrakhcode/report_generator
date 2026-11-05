@@ -1,5 +1,4 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { MonthlyReportData } from '../types';
 import { hexToRgb, resolveTemplate } from '../lib/reportTheme';
 import { downloadBlob } from '../lib/reportTokens';
@@ -92,149 +91,27 @@ export function buildPdfBlob(report: MonthlyReportData, templateId?: string): Bl
 
   doc.setFontSize(7.5);
   doc.setTextColor(TEXT_MUTED[0], TEXT_MUTED[1], TEXT_MUTED[2]);
-  doc.text('Infrastructure Uptime', 18, currentY + 5);
+  doc.text('Tickets posted', 18, currentY + 5);
   doc.text('Activities Completed', 64, currentY + 5);
   doc.text('Ticket SLA Rate', 110, currentY + 5);
-  doc.text('Weighted KPI', 156, currentY + 5);
+  doc.text('Projects', 156, currentY + 5);
 
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text(`${report.kpisSummary.averageAchievement}%`, 18, currentY + 12);
+  doc.text(`${(report.ticketsSummary.tickets || []).length}`, 18, currentY + 12);
   doc.text(`${report.activitiesSummary.completed} (${report.activitiesSummary.totalHours}h)`, 64, currentY + 12);
   doc.text(`${report.ticketsSummary.slaCompliancePercent}%`, 110, currentY + 12);
-  doc.text(`${report.kpisSummary.averageAchievement}%`, 156, currentY + 12);
+  doc.text(`${report.projectsSummary.projects.length}`, 156, currentY + 12);
 
   currentY += 24;
 
-  // 2. Key Performance Indicators Table
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text('2. Key Performance Indicators (KPIs) Achievement', 14, currentY);
-  currentY += 4;
-
-  const kpiBody = report.kpisSummary.kpis.map((k) => [
-    k.name,
-    `${k.targetValue} ${k.unit}`,
-    `${k.actualValue} ${k.unit}`,
-    `${k.weightPercent}%`,
-    `${k.achievementPercent}%`,
-    k.status
-  ]);
-
-  autoTable(doc, {
-    startY: currentY,
-    head: [['KPI Performance Metric', 'Target', 'Actual', 'Weight', 'Achievement', 'Status']],
-    body: kpiBody,
-    theme: 'grid',
-    headStyles: { fillColor: NAVY, textColor: 255, fontSize: 8.5 },
-    styles: { fontSize: 8, cellPadding: 2.5 },
-    columnStyles: {
-      0: { cellWidth: 70 },
-      1: { halign: 'center' },
-      2: { halign: 'center' },
-      3: { halign: 'center' },
-      4: { halign: 'center', fontStyle: 'bold' },
-      5: { halign: 'center' }
-    }
-  });
-
-  // @ts-expect-error autoTable adds lastAutoTable to doc
-  currentY = doc.lastAutoTable.finalY + 10;
-
-  // 3. Completed Daily Activities Table
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text('3. Key Completed Activities & Business Outcomes', 14, currentY);
-  currentY += 4;
-
-  const actBody = (report.activitiesSummary.topActivities || []).map((a) => [
-    a.date,
-    a.title,
-    a.department,
-    `${a.hoursSpent}h`,
-    a.businessImpact
-  ]);
-
-  autoTable(doc, {
-    startY: currentY,
-    head: [['Date', 'Activity & Action Taken', 'Department', 'Hours', 'Business Impact']],
-    body: actBody,
-    theme: 'grid',
-    headStyles: { fillColor: [30, 96, 145], textColor: 255, fontSize: 8.5 },
-    styles: { fontSize: 8, cellPadding: 2.5 },
-    columnStyles: {
-      0: { cellWidth: 22, halign: 'center' },
-      1: { cellWidth: 65 },
-      2: { cellWidth: 26 },
-      3: { cellWidth: 15, halign: 'center' },
-      4: { cellWidth: 54 }
-    }
-  });
-
-  // @ts-expect-error autoTable adds lastAutoTable to doc
-  currentY = doc.lastAutoTable.finalY + 10;
-
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text('4. Support Tickets', 14, currentY);
-  currentY += 4;
-
-  const ticketBody = (report.ticketsSummary.tickets || []).map((item) => [
-    item.id,
-    item.title,
-    item.department,
-    item.status,
-    item.priority
-  ]);
-
-  autoTable(doc, {
-    startY: currentY,
-    head: [['ID', 'Ticket', 'Department', 'Status', 'Priority']],
-    body: ticketBody.length ? ticketBody : [['—', 'No tickets for this period', '—', '—', '—']],
-    theme: 'grid',
-    headStyles: { fillColor: NAVY, textColor: 255, fontSize: 8.5 },
-    styles: { fontSize: 8, cellPadding: 2.5 }
-  });
-
-  // @ts-expect-error autoTable adds lastAutoTable to doc
-  currentY = doc.lastAutoTable.finalY + 10;
-
-  doc.setFontSize(12);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text('5. Projects & Assigned Performers', 14, currentY);
-  currentY += 4;
-
-  const projectBody = (report.projectsSummary.projects || []).map((item) => [
-    item.name,
-    item.assignedUserName || item.owner,
-    item.status,
-    `${item.progressPercent}%`
-  ]);
-
-  autoTable(doc, {
-    startY: currentY,
-    head: [['Project', 'Assigned to', 'Status', 'Progress']],
-    body: projectBody.length ? projectBody : [['No projects recorded', '—', '—', '—']],
-    theme: 'grid',
-    headStyles: { fillColor: NAVY, textColor: 255, fontSize: 8.5 },
-    styles: { fontSize: 8, cellPadding: 2.5 }
-  });
-
-  // New Page for Strategic Sections & Sign-off
-  doc.addPage();
-  currentY = 20;
-
-  // 4. Strategic Narrative Sections
   const narrativeBlocks = [
-    { title: '4. Major Achievements & Measurable Outcomes', content: report.majorAchievements },
-    { title: '5. Outstanding Issues & Carried-Forward Actions', content: report.outstandingIssues },
-    { title: '6. Operational Challenges & System Risks', content: report.challengesAndRisks },
-    { title: "7. Next Month's Key Priorities", content: report.nextMonthPriorities }
+    { title: '2. Daily Work', content: report.majorAchievements },
+    { title: '3. Helpdesk Tickets', content: report.outstandingIssues },
+    { title: '4. Projects', content: report.challengesAndRisks },
+    { title: '5. Follow-up', content: report.recommendations },
+    { title: '6. Training', content: report.nextMonthPriorities }
   ];
 
   narrativeBlocks.forEach((b) => {
@@ -258,7 +135,7 @@ export function buildPdfBlob(report: MonthlyReportData, templateId?: string): Bl
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-  doc.text('8. Formal Review & Sign-Off Authorization', 14, currentY);
+  doc.text('7. Formal Review & Sign-Off Authorization', 14, currentY);
   currentY += 8;
 
   // Signature boxes

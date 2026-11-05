@@ -47,12 +47,106 @@ async function fetchTiceket(path: string, cookie: string, token: string) {
 }
 
 function ticeketSupabase(): SupabaseClient | null {
-  const url = (process.env.TICEKET_SUPABASE_URL || '').trim();
-  const secret = (process.env.TICEKET_SUPABASE_SECRET_KEY || process.env.TICEKET_SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const url = (
+    process.env.TICEKET_SUPABASE_URL ||
+    process.env.TICKET_SUPABASE_URL ||
+    ''
+  ).trim();
+  const secret = (
+    process.env.TICEKET_SUPABASE_SECRET_KEY ||
+    process.env.TICEKET_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.TICEKET_SERVICE_ROLE_KEY ||
+    ''
+  ).trim();
   if (!url || !secret) return null;
   return createClient(url, secret, {
     auth: { persistSession: false, autoRefreshToken: false }
   });
+}
+
+async function loginTiceket(): Promise<{ cookie: string; token: string; base: string } | null> {
+  const username = (process.env.TICEKET_USERNAME || '').trim();
+  const password = (process.env.TICEKET_PASSWORD || '').trim();
+  if (!username || !password) return null;
+  const base = (process.env.TICEKET_BASE_URL || DEFAULT_BASE).replace(/\/$/, '');
+  const login = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ username, password })
+  });
+  const loginBody = (await readJson(login)) as Json | null;
+  if (!login.ok) {
+    const message =
+      loginBody && typeof loginBody.error === 'string' ? loginBody.error : `Ticeket login failed (${login.status}).`;
+    throw new Error(message);
+  }
+  return {
+    cookie: cookieHeader(login),
+    token: String(loginBody?.token || loginBody?.access_token || loginBody?.accessToken || ''),
+    base
+  };
+}
+
+async function pushViaTiceketHttp(input: {
+  rmsTicketId: string;
+  status: string;
+  assignedTechnician?: string;
+}): Promise<Json> {
+  const session = await loginTiceket();
+  if (!session) throw new Error('Help Desk is not configured.');
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Content-Type': 'application/json'
+  };
+  if (session.cookie) headers.Cookie = session.cookie;
+  if (session.token) headers.Authorization = `Bearer ${session.token}`;
+
+  const external = input.rmsTicketId.replace(/^TCK-EXT-/i, '').trim();
+  const lists = await Promise.all([
+    fetchTiceket('/api/tickets', session.cookie, session.token),
+    fetchTiceket('/api/tickets/my', session.cookie, session.token),
+    fetchTiceket('/api/tickets/unassigned', session.cookie, session.token)
+  ]);
+  const byKey = new Map<string, Json>();
+  lists.flat().forEach((item) => {
+    const id = String(item.id || item.ticket_id || '');
+    const number = String(item.ticket_number || item.ticketNumber || '');
+    if (id) byKey.set(id, item);
+    if (number) byKey.set(number, item);
+  });
+  const row = byKey.get(external);
+  if (!row?.id) throw new Error('Help Desk ticket was not found.');
+  const technician = (input.assignedTechnician || '').toLowerCase();
+  const unassign =
+    technician === 'unassigned' && input.status !== 'Closed' && input.status !== 'Resolved';
+  const payload: Json = {
+    status: toHelpdeskStatus(input.status, !unassign),
+    ticket_id: row.id,
+    id: row.id
+  };
+  if (unassign) payload.agent_id = null;
+
+  const attempts = [
+    { method: 'PATCH', path: `/api/tickets/${row.id}` },
+    { method: 'PUT', path: `/api/tickets/${row.id}` },
+    { method: 'POST', path: `/api/tickets/${row.id}` },
+    { method: 'POST', path: `/api/tickets/${row.id}/status` }
+  ];
+  let lastError = 'Help Desk did not accept the status update.';
+  for (const attempt of attempts) {
+    const response = await fetch(`${session.base}${attempt.path}`, {
+      method: attempt.method,
+      headers,
+      body: JSON.stringify(payload)
+    });
+    const body = (await readJson(response)) as Json | null;
+    if (response.ok) {
+      return { ...(body && typeof body === 'object' ? body : row), _rmsSource: 'my-tickets' };
+    }
+    lastError =
+      (body && typeof body.error === 'string' && body.error) || `Help Desk returned ${response.status}.`;
+  }
+  throw new Error(lastError);
 }
 
 async function findIbrahimProfiles(client: SupabaseClient) {
@@ -156,25 +250,10 @@ async function pullFromSupabase(client: SupabaseClient): Promise<Json[]> {
 }
 
 async function pullFromNetlifyLogin(): Promise<Json[] | null> {
-  const username = (process.env.TICEKET_USERNAME || '').trim();
-  const password = (process.env.TICEKET_PASSWORD || '').trim();
-  if (!username || !password) return null;
-
-  const base = (process.env.TICEKET_BASE_URL || DEFAULT_BASE).replace(/\/$/, '');
-  const login = await fetch(`${base}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ username, password })
-  });
-  const loginBody = (await readJson(login)) as Json | null;
-  if (!login.ok) {
-    const message =
-      loginBody && typeof loginBody.error === 'string' ? loginBody.error : `Ticeket login failed (${login.status}).`;
-    throw new Error(message);
-  }
-
-  const cookie = cookieHeader(login);
-  const token = String(loginBody?.token || loginBody?.access_token || loginBody?.accessToken || '');
+  const session = await loginTiceket();
+  if (!session) return null;
+  const cookie = session.cookie;
+  const token = session.token;
   const [mine, unassigned, all] = await Promise.all([
     fetchTiceket('/api/tickets/my', cookie, token),
     fetchTiceket('/api/tickets/unassigned', cookie, token),
@@ -281,7 +360,7 @@ export async function pushHelpdeskTicketUpdate(input: {
   assignedTechnician?: string;
 }): Promise<Json> {
   const client = ticeketSupabase();
-  if (!client) throw new Error('Help Desk is not configured.');
+  if (!client) return pushViaTiceketHttp(input);
 
   const row = await findHelpdeskTicketRow(client, input.rmsTicketId);
   const agents = await findIbrahimProfiles(client);

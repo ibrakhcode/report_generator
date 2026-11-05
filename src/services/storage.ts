@@ -19,6 +19,8 @@ import {
 } from '../types';
 import type { RmsCollection } from '@/lib/supabase/rmsMap';
 import { inYearMonth, isYearMonth, projectSpansMonth, readSelectedMonth } from '@/lib/selectedMonth';
+import { activityFromClosedTicket } from '@/lib/externalTicketIngest';
+import { isAssignedToIbrahim, isUnassignedTicket } from '@/lib/assignedTickets';
 import { notify } from '@/lib/systemNotify';
 
 const STORAGE_KEYS = {
@@ -120,10 +122,14 @@ export const INITIAL_SETTINGS: AppSettings = {
   idleTimeoutMinutes: 15,
   emailService: {
     enabled: true,
-    provider: 'Simulation',
-    fromEmail: 'ict-support@hesu.co.tz',
+    provider: 'SMTP',
+    fromEmail: 'helpdesk@hesu.co.tz',
     fromName: 'ICT Department',
+    smtpUser: 'helpdesk@hesu.co.tz',
+    recipientEmail: 'imsambwe@hesu.co.tz',
     apiKeyOrPass: '',
+    host: 'mail.hesu.co.tz',
+    port: 465,
     configured: false,
   },
   whatsappService: {
@@ -136,8 +142,8 @@ export const INITIAL_SETTINGS: AppSettings = {
 
 export const INITIAL_TEMPLATE: ReportTemplate = {
   id: 'TMPL-ICT-2026',
-  name: 'ICT Monthly Report 2026',
-  description: 'Shared default PowerPoint look from ICT_Monthly_Report_2026.pptx.',
+  name: 'IT Support Monthly Report',
+  description: 'Professional IT Support monthly operations PowerPoint.',
   isDefault: true,
   slideFormat: '16:9',
   primaryColor: '#071B33',
@@ -147,11 +153,10 @@ export const INITIAL_TEMPLATE: ReportTemplate = {
   headerText: 'Monthly Performance Report',
   footerText: 'Confidential — For Internal Management Use Only',
   hasUploadedFile: true,
-  uploadedTemplateName: 'ICT_Monthly_Report_2026.pptx',
+  uploadedTemplateName: 'IT_Support_Monthly_Report_Template.pptx',
   sectionsOrder: [
     'cover',
     'executive_summary',
-    'kpis',
     'activities',
     'support_tickets',
     'sap_systems',
@@ -170,7 +175,9 @@ class StorageService {
   private hydrating = false;
   private persistQueue = new Map<RmsCollection, unknown>();
   private lastPersistPromise: Promise<boolean> | null = null;
+  private lastHelpdeskPush: Promise<boolean> | null = null;
   private lastPersistError = '';
+  private closedWorkBackfilled = false;
   private mem = new Map<string, string>();
   private sessionAccount: User | null = null;
 
@@ -264,6 +271,11 @@ class StorageService {
     return this.lastPersistPromise;
   }
 
+  public async waitForHelpdeskPush(): Promise<boolean> {
+    if (!this.lastHelpdeskPush) return true;
+    return this.lastHelpdeskPush;
+  }
+
   public getLastPersistError(): string {
     return this.lastPersistError;
   }
@@ -291,19 +303,23 @@ class StorageService {
     activities?: DailyActivity[];
   } | null> {
     if (typeof window === 'undefined') return null;
-    const response = await fetch('/api/rms/tickets/sync', {
-      method: 'POST',
-      credentials: 'include',
-      cache: 'no-store'
-    });
-    if (!response.ok) return null;
-    const payload = (await response.json().catch(() => ({}))) as {
-      ok?: boolean;
-      tickets?: SupportTicket[];
-      activities?: DailyActivity[];
-    };
-    if (!payload.ok) return null;
-    return payload;
+    try {
+      const response = await fetch('/api/rms/tickets/sync', {
+        method: 'POST',
+        credentials: 'include',
+        cache: 'no-store'
+      });
+      if (!response.ok) return null;
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        tickets?: SupportTicket[];
+        activities?: DailyActivity[];
+      };
+      if (!payload.ok) return null;
+      return payload;
+    } catch {
+      return null;
+    }
   }
 
   public async pullHelpdesk(): Promise<void> {
@@ -313,15 +329,24 @@ class StorageService {
   }
 
   public async refreshRemoteSources(): Promise<void> {
-    await this.syncFromCloud();
-    await this.pullHelpdesk();
+    try {
+      await this.syncFromCloud();
+      await this.pullHelpdesk();
+    } catch {
+      return;
+    }
   }
 
   public async syncFromCloud(): Promise<void> {
     if (typeof window === 'undefined') return;
-    const response = await fetch('/api/rms/workspace', { credentials: 'include', cache: 'no-store' });
+    let response: Response;
+    try {
+      response = await fetch('/api/rms/workspace', { credentials: 'include', cache: 'no-store' });
+    } catch {
+      return;
+    }
     if (!response.ok) return;
-    const payload = (await response.json()) as {
+    const payload = (await response.json().catch(() => ({}))) as {
       ok?: boolean;
       data?: {
         activities?: DailyActivity[];
@@ -373,20 +398,32 @@ class StorageService {
       if (!cloud) return;
       this.writeArray(base, cloud, { cloud: false });
     };
-    const takeCloudKeepExt = <T extends { id: string }>(
+    const takeCloudKeepExt = <T extends { id: string; updatedAt?: string }>(
       cloud: T[] | undefined,
       base: string,
       prefixes: string[]
     ) => {
       if (!cloud) return;
       const local = this.readArray<T>(base);
-      const extra = local.filter(
-        (item) =>
-          prefixes.some((prefix) => item.id.startsWith(prefix)) && !cloud.some((row) => row.id === item.id)
-      );
-      this.writeArray(base, [...cloud, ...extra], { cloud: false });
+      const byId = new Map(cloud.map((item) => [item.id, item]));
+      local.forEach((item) => {
+        if (!prefixes.some((prefix) => item.id.startsWith(prefix))) return;
+        const remote = byId.get(item.id);
+        if (!remote) {
+          byId.set(item.id, item);
+          return;
+        }
+        if ((item as { status?: string }).status === 'Completed') {
+          byId.set(item.id, item);
+          return;
+        }
+        if (Date.parse(item.updatedAt || '') > Date.parse(remote.updatedAt || '')) {
+          byId.set(item.id, { ...remote, ...item });
+        }
+      });
+      this.writeArray(base, Array.from(byId.values()), { cloud: false });
     };
-    takeCloudKeepExt(data.activities, STORAGE_KEYS.ACTIVITIES, ['ACT-EXT-']);
+    takeCloudKeepExt(data.activities, STORAGE_KEYS.ACTIVITIES, ['ACT-EXT-', 'ACT-TCK-']);
     takeCloudKeepExt(data.tickets, STORAGE_KEYS.TICKETS, ['TCK-EXT-']);
     takeCloud(data.sapIssues, STORAGE_KEYS.SAP_ISSUES);
     takeCloud(data.projects, STORAGE_KEYS.PROJECTS);
@@ -394,7 +431,17 @@ class StorageService {
     takeCloud(data.evidence, STORAGE_KEYS.EVIDENCE);
     takeCloud(data.training, STORAGE_KEYS.TRAINING);
     takeCloud(data.reports, STORAGE_KEYS.REPORTS);
-    takeCloud(data.reportPosts, STORAGE_KEYS.REPORT_POSTS);
+    if (data.reportPosts) {
+      this.writeArray(
+        STORAGE_KEYS.REPORT_POSTS,
+        this.mergeById(data.reportPosts, this.getReportPosts()),
+        { cloud: false }
+      );
+    }
+    if (!this.closedWorkBackfilled) {
+      this.closedWorkBackfilled = true;
+      this.ensureWorkFromClosedTickets();
+    }
     if (data.templates) {
       this.writeArray(STORAGE_KEYS.TEMPLATES, data.templates, { cloud: false });
     }
@@ -456,8 +503,7 @@ class StorageService {
 
   public userHasCompany(user?: User | null): boolean {
     const account = user || this.getSessionUser();
-    if (!account?.companyId) return false;
-    return this.getCompanyRecords().some((item) => item.id === account.companyId);
+    return Boolean(account?.companyId);
   }
 
   public getCompanyUsers(companyId?: string): User[] {
@@ -826,6 +872,9 @@ class StorageService {
       this.logAudit('CREATE', 'IT Support Tickets', ticket.id, `Opened ticket: ${ticket.title}`);
     }
     this.writeArray(STORAGE_KEYS.TICKETS, list);
+    const closedNow = toSave.status === 'Closed' || toSave.status === 'Resolved';
+    const wasOpen = !previous || (previous.status !== 'Closed' && previous.status !== 'Resolved');
+    if (closedNow && wasOpen) this.ensureWorkFromClosedTickets([toSave.id]);
     this.placeRecordInReport('tickets', toSave.id, toSave.reportedAt);
     this.notify();
     if (
@@ -834,7 +883,7 @@ class StorageService {
       previous &&
       (previous.status !== toSave.status || previous.assignedTechnician !== toSave.assignedTechnician)
     ) {
-      void fetch('/api/rms/tickets/push', {
+      this.lastHelpdeskPush = fetch('/api/rms/tickets/push', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -848,10 +897,13 @@ class StorageService {
           const payload = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
           if (!response.ok || !payload.ok) {
             notify.error('Help Desk was not updated', payload.error || 'Close or pick again so both systems match.');
+            return false;
           }
+          return true;
         })
         .catch(() => {
           notify.error('Help Desk was not updated', 'Check the connection and save the ticket again.');
+          return false;
         });
     }
     return toSave;
@@ -865,12 +917,28 @@ class StorageService {
   }
 
   public mergeExternalHelpdesk(tickets: SupportTicket[], activities: DailyActivity[]) {
+    const previousTickets = this.getTickets();
     if (tickets.length) {
-      const current = this.getTickets();
+      const current = previousTickets;
       const byId = new Map(current.map((item) => [item.id, item]));
       const merged = tickets.map((item) => {
         const existing = byId.get(item.id);
         if (!existing) return item;
+        if (isAssignedToIbrahim(existing) && isUnassignedTicket(item)) {
+          return existing;
+        }
+        if (isUnassignedTicket(existing) && isAssignedToIbrahim(item)) {
+          return {
+            ...existing,
+            ...item,
+            assignedTechnician: item.assignedTechnician,
+            status: item.status === 'Closed' || item.status === 'Resolved' ? item.status : item.status || 'Open',
+            updatedAt: item.updatedAt || existing.updatedAt
+          };
+        }
+        if (Date.parse(existing.updatedAt || '') > Date.parse(item.updatedAt || '')) {
+          return existing;
+        }
         const genericAction = (item.actionsTaken || '').startsWith('Imported from external');
         return {
           ...existing,
@@ -890,9 +958,79 @@ class StorageService {
       this.writeArray(STORAGE_KEYS.TICKETS, this.mergeById(merged, current), { cloud: false });
     }
     if (activities.length) {
-      this.writeArray(STORAGE_KEYS.ACTIVITIES, this.mergeById(activities, this.getActivities()), { cloud: false });
+      const local = this.getActivities();
+      const localById = new Map(local.map((item) => [item.id, item]));
+      const kept = activities.map((item) => {
+        const existing = localById.get(item.id);
+        if (existing?.status === 'Completed') return existing;
+        return item;
+      });
+      this.writeArray(STORAGE_KEYS.ACTIVITIES, this.mergeById(kept, local), { cloud: false });
     }
+    const incomingIds = new Set(tickets.map((item) => item.id));
+    const newlyClosed = this.getTickets().filter((item) => {
+      if (!incomingIds.has(item.id)) return false;
+      if (item.status !== 'Closed' && item.status !== 'Resolved') return false;
+      const prev = previousTickets.find((row) => row.id === item.id);
+      return !prev || (prev.status !== 'Closed' && prev.status !== 'Resolved');
+    });
+    if (newlyClosed.length) this.ensureWorkFromClosedTickets(newlyClosed.map((item) => item.id));
     if (tickets.length || activities.length) this.notify();
+  }
+
+  private ensureWorkFromClosedTickets(onlyIds?: string[]) {
+    const allTickets = this.getTickets();
+    const closed = allTickets.filter((item) => {
+      if (item.status !== 'Closed' && item.status !== 'Resolved') return false;
+      return !onlyIds?.length || onlyIds.includes(item.id);
+    });
+    if (!closed.length) return;
+    const now = new Date().toISOString();
+    const byId = new Map(this.getActivities().map((item) => [item.id, item]));
+    const byTicket = new Map<string, DailyActivity>();
+    byId.forEach((item) => {
+      if (item.relatedTicketId) byTicket.set(item.relatedTicketId, item);
+    });
+    let activitiesChanged = false;
+    let ticketsChanged = false;
+    const nextTickets = allTickets.map((ticket) => {
+      if (!closed.some((item) => item.id === ticket.id)) return ticket;
+      const generated = activityFromClosedTicket(ticket);
+      const existing =
+        (ticket.relatedActivityId ? byId.get(ticket.relatedActivityId) : undefined) ||
+        byTicket.get(ticket.id) ||
+        byId.get(generated.id);
+      if (existing?.status === 'Completed' && existing.date === generated.date) {
+        byTicket.set(ticket.id, existing);
+        return ticket;
+      }
+      const work: DailyActivity = existing
+        ? {
+            ...existing,
+            ...generated,
+            id: existing.id,
+            createdAt: existing.createdAt,
+            status: 'Completed',
+            relatedTicketId: ticket.id,
+            updatedAt: now
+          }
+        : generated;
+      activitiesChanged = true;
+      byId.set(work.id, work);
+      byTicket.set(ticket.id, work);
+      if (ticket.relatedActivityId !== work.id) {
+        ticketsChanged = true;
+        return { ...ticket, relatedActivityId: work.id };
+      }
+      return ticket;
+    });
+    if (activitiesChanged) this.writeArray(STORAGE_KEYS.ACTIVITIES, Array.from(byId.values()));
+    if (ticketsChanged) this.writeArray(STORAGE_KEYS.TICKETS, nextTickets);
+    closed.forEach((ticket) => {
+      const work = byTicket.get(ticket.id);
+      if (work) this.placeRecordInReport('activities', work.id, work.date);
+      this.placeRecordInReport('tickets', ticket.id, ticket.resolvedAt || ticket.reportedAt);
+    });
   }
 
   // --- SAP Issues CRUD ---
@@ -1012,7 +1150,6 @@ class StorageService {
       this.logAudit('CREATE', 'KPI Management', kpi.id, `Created KPI: ${kpi.name}`);
     }
     this.writeArray(STORAGE_KEYS.KPIS, list);
-    this.placeRecordInReport('kpis', toSave.id, `${readSelectedMonth()}-01`);
     this.notify();
     return toSave;
   }
@@ -1221,18 +1358,17 @@ class StorageService {
     if (existing) {
       existing.isDefault = true;
       existing.hasUploadedFile = true;
-      existing.uploadedTemplateName = INITIAL_TEMPLATE.uploadedTemplateName;
-      existing.name = INITIAL_TEMPLATE.name;
-      existing.description = INITIAL_TEMPLATE.description;
-      existing.primaryColor = INITIAL_TEMPLATE.primaryColor;
-      existing.accentColor = INITIAL_TEMPLATE.accentColor;
-      existing.textColor = INITIAL_TEMPLATE.textColor;
-      existing.fontFamily = INITIAL_TEMPLATE.fontFamily;
-      existing.headerText = INITIAL_TEMPLATE.headerText;
-      existing.footerText = INITIAL_TEMPLATE.footerText;
-      existing.slideFormat = INITIAL_TEMPLATE.slideFormat;
-      existing.sectionsOrder = INITIAL_TEMPLATE.sectionsOrder;
-      existing.storagePath = undefined;
+      existing.uploadedTemplateName = existing.uploadedTemplateName || INITIAL_TEMPLATE.uploadedTemplateName;
+      existing.name = existing.name || INITIAL_TEMPLATE.name;
+      existing.description = existing.description || INITIAL_TEMPLATE.description;
+      existing.primaryColor = existing.primaryColor || INITIAL_TEMPLATE.primaryColor;
+      existing.accentColor = existing.accentColor || INITIAL_TEMPLATE.accentColor;
+      existing.textColor = existing.textColor || INITIAL_TEMPLATE.textColor;
+      existing.fontFamily = existing.fontFamily || INITIAL_TEMPLATE.fontFamily;
+      existing.headerText = existing.headerText || INITIAL_TEMPLATE.headerText;
+      existing.footerText = existing.footerText || INITIAL_TEMPLATE.footerText;
+      existing.slideFormat = existing.slideFormat || INITIAL_TEMPLATE.slideFormat;
+      existing.sectionsOrder = existing.sectionsOrder || INITIAL_TEMPLATE.sectionsOrder;
       return next;
     }
     return [{ ...INITIAL_TEMPLATE, isDefault: true }, ...next.map((item) => ({ ...item, isDefault: false }))];
@@ -1255,9 +1391,15 @@ class StorageService {
   public saveTemplate(template: ReportTemplate): ReportTemplate {
     if (template.id === INITIAL_TEMPLATE.id) {
       const list = this.getTemplates();
+      const existing = list.find((item) => item.id === INITIAL_TEMPLATE.id);
+      if (existing) {
+        existing.hasUploadedFile = true;
+        existing.uploadedTemplateName = template.uploadedTemplateName || existing.uploadedTemplateName;
+        existing.updatedAt = nowIso();
+      }
       this.writeArray(STORAGE_KEYS.TEMPLATES, list);
       this.notify();
-      return list.find((item) => item.id === INITIAL_TEMPLATE.id) || INITIAL_TEMPLATE;
+      return existing || INITIAL_TEMPLATE;
     }
     const list = this.getTemplates();
     const idx = list.findIndex((t) => t.id === template.id);
@@ -1292,19 +1434,19 @@ class StorageService {
   }
 
   private placeRecordInReport(source: ReportPostSource, recordId: string, dateValue?: string) {
+    if (source === 'kpis') return;
     const month = String(dateValue || '').slice(0, 7);
     if (!isYearMonth(month) || !recordId) return;
-    if (!this.isPostedToReport(source, recordId, month)) {
-      const list = this.getReportPosts();
-      list.push({
-        id: `POST-${month}-${source}-${recordId}`,
-        month,
-        source,
-        recordId,
-        postedAt: nowIso()
-      });
-      this.writeArray(STORAGE_KEYS.REPORT_POSTS, list);
-    }
+    if (this.isPostedToReport(source, recordId, month)) return;
+    const list = this.getReportPosts();
+    list.push({
+      id: `POST-${month}-${source}-${recordId}`,
+      month,
+      source,
+      recordId,
+      postedAt: nowIso()
+    });
+    this.writeArray(STORAGE_KEYS.REPORT_POSTS, list);
     this.syncMonthlyReportFromPosts(month);
   }
 
@@ -1314,7 +1456,42 @@ class StorageService {
     );
   }
 
+  public postAllForMonth(month: string): number {
+    if (!isYearMonth(month)) return 0;
+    const list = this.getReportPosts();
+    const existing = new Set(list.map((item) => `${item.source}:${item.recordId}:${item.month}`));
+    const buckets: { source: ReportPostSource; ids: string[] }[] = [
+      { source: 'tickets', ids: this.getTickets().filter((item) => inYearMonth(item.reportedAt, month)).map((item) => item.id) },
+      { source: 'activities', ids: this.getActivities().filter((item) => inYearMonth(item.date, month)).map((item) => item.id) },
+      { source: 'projects', ids: this.getProjects().filter((item) => projectSpansMonth(item, month)).map((item) => item.id) },
+      { source: 'training', ids: this.getTraining().filter((item) => inYearMonth(item.date, month)).map((item) => item.id) }
+    ];
+    let added = 0;
+    buckets.forEach((bucket) => {
+      bucket.ids.forEach((id) => {
+        const key = `${bucket.source}:${id}:${month}`;
+        if (existing.has(key) || !id) return;
+        list.push({
+          id: `POST-${month}-${bucket.source}-${id}`,
+          month,
+          source: bucket.source,
+          recordId: id,
+          postedAt: nowIso()
+        });
+        existing.add(key);
+        added += 1;
+      });
+    });
+    if (added) {
+      this.writeArray(STORAGE_KEYS.REPORT_POSTS, list);
+      this.syncMonthlyReportFromPosts(month);
+      this.notify();
+    }
+    return added;
+  }
+
   public postToReport(source: ReportPostSource, recordId: string, month: string) {
+    if (source === 'kpis') return;
     if (this.isPostedToReport(source, recordId, month)) return;
     const list = this.getReportPosts();
     list.push({
@@ -1340,6 +1517,7 @@ class StorageService {
   }
 
   public postManyToReport(source: ReportPostSource, recordIds: string[], month: string) {
+    if (source === 'kpis') return;
     const existing = new Set(
       this.getReportPosts()
         .filter((item) => item.month === month && item.source === source)
@@ -1369,7 +1547,11 @@ class StorageService {
       selectedTemplateId: saved?.selectedTemplateId,
       status: saved?.status || live.status,
       version: saved?.version || live.version,
-      createdAt: saved?.createdAt || live.createdAt
+      createdAt: saved?.createdAt || live.createdAt,
+      feedbackToken: saved?.feedbackToken,
+      feedbackRecipients: saved?.feedbackRecipients,
+      feedbackUnseen: saved?.feedbackUnseen,
+      feedbackComments: saved?.feedbackComments
     };
     const list = this.getReports();
     const idx = list.findIndex((item) => item.month === yearMonth || item.id === live.id);
@@ -1393,7 +1575,11 @@ class StorageService {
       ...live,
       selectedTemplateId: saved?.selectedTemplateId,
       status: saved?.status || live.status,
-      version: saved?.version || live.version
+      version: saved?.version || live.version,
+      feedbackToken: saved?.feedbackToken,
+      feedbackRecipients: saved?.feedbackRecipients,
+      feedbackUnseen: saved?.feedbackUnseen,
+      feedbackComments: saved?.feedbackComments
     };
   }
 
@@ -1448,8 +1634,8 @@ class StorageService {
     }
   }
 
-  public isCompanyRegistered(): boolean {
-    return this.userHasCompany();
+  public isCompanyRegistered(user?: User | null): boolean {
+    return this.userHasCompany(user);
   }
 
   public saveSettings(settings: AppSettings, options?: { silent?: boolean }): AppSettings {
@@ -1739,7 +1925,6 @@ class StorageService {
     const postedActivities = this.postedRecordIds('activities', yearMonth);
     const postedTickets = this.postedRecordIds('tickets', yearMonth);
     const postedProjects = this.postedRecordIds('projects', yearMonth);
-    const postedKpis = this.postedRecordIds('kpis', yearMonth);
     const postedTraining = this.postedRecordIds('training', yearMonth);
     const postedSap = this.postedRecordIds('sap', yearMonth);
     const activities = this.getActivities().filter(
@@ -1785,10 +1970,9 @@ class StorageService {
     const activeProjects = projects.filter((p) => p.status === 'In Progress' || p.status === 'Planned' || p.status === 'Active');
     const completedMilestones = projects.reduce((acc, p) => acc + (p.milestones?.filter((m) => m.status === 'Completed').length || 0), 0);
 
-    const kpis = this.getKpis().filter((item) => postedKpis.has(item.id));
-    const totalWeight = kpis.reduce((acc, k) => acc + (k.weightPercent || 0), 0);
-    const weightedSum = kpis.reduce((acc, k) => acc + ((k.achievementPercent || 0) * ((k.weightPercent || 0) / 100)), 0);
-    const averageAchievement = kpis.length > 0 ? Number(weightedSum.toFixed(1)) : 0;
+    const kpis: MonthlyReportData['kpisSummary']['kpis'] = [];
+    const totalWeight = 0;
+    const averageAchievement = 0;
 
     const training = this.getTraining().filter(
       (tr) => inYearMonth(tr.date, yearMonth) && postedTraining.has(tr.id)
@@ -1812,9 +1996,9 @@ class StorageService {
       reportingPeriod: `${monthName} 1, ${year} – ${monthName} ${new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate()}, ${year}`,
       executiveSummary:
         activities.length > 0 || tickets.length > 0 || projects.length > 0
-          ? `During ${monthName} ${year}, Daily Work recorded ${activities.length} item(s) (${completedActivities.length} completed, ${Number(totalHours.toFixed(1))} hours). Helpdesk recorded ${tickets.length} ticket(s) with ${closedTickets.length} resolved (${slaCompliancePercent}% SLA). Projects recorded ${projects.length} initiative(s) with ${completedMilestones} completed milestone(s).`
+          ? `During ${monthName} ${year}, ICT posted ${activities.length} daily work item(s) (${completedActivities.length} completed, ${Number(totalHours.toFixed(1))} hours), ${tickets.length} helpdesk ticket(s) with ${closedTickets.length} resolved (${slaCompliancePercent}% SLA), and ${projects.length} project(s).`
           : `No posted Daily Work, Helpdesk tickets, or Projects for ${monthName} ${year}. Post each source first so it appears in this report.`,
-      includedSections: ['cover', 'executive_summary', 'kpis', 'activities', 'support_tickets', 'sap_systems', 'projects', 'training', 'achievements', 'challenges_recommendations', 'next_month_priorities', 'signoff'],
+      includedSections: ['cover', 'executive_summary', 'activities', 'support_tickets', 'sap_systems', 'projects', 'training', 'achievements', 'challenges_recommendations', 'next_month_priorities', 'signoff'],
       kpisSummary: {
         totalWeight,
         averageAchievement,
@@ -1853,15 +2037,22 @@ class StorageService {
         totalParticipants,
         sessions: training
       },
-      majorAchievements: completedActivities.length
-        ? completedActivities.map((item) => `${item.title} (${item.department})`).join('\n')
-        : 'No completed daily work recorded for this period.',
-      outstandingIssues: openedTickets.length
-        ? openedTickets.map((item) => `${item.title} [${item.status}]`).join('\n')
-        : 'No open tickets recorded for this period.',
-      challengesAndRisks: 'None recorded yet.',
-      recommendations: 'None recorded yet.',
-      nextMonthPriorities: 'None recorded yet.',
+      majorAchievements: activities.length
+        ? `Daily work for ${monthName} ${year}: ${activities.length} posted item(s), ${completedActivities.length} completed, ${inProgressActivities.length} in progress, ${pendingActivities.length} planned or blocked, totalling ${Number(totalHours.toFixed(1))} hours. Coverage included ${Array.from(new Set(activities.map((item) => item.department).filter(Boolean))).join(', ') || 'ICT units'}.`
+        : `No posted daily work for ${monthName} ${year}.`,
+      outstandingIssues: tickets.length
+        ? `Helpdesk for ${monthName} ${year}: ${tickets.length} posted ticket(s), ${closedTickets.length} resolved, ${openedTickets.length} still open, ${overdueTickets.length} SLA breach(es), average resolution ${avgResolutionHours} hours, SLA compliance ${slaCompliancePercent}%. ${Object.keys(byCategory).length ? `Categories: ${Object.entries(byCategory).map(([name, count]) => `${name} ${count}`).join(', ')}.` : ''}`
+        : `No posted helpdesk tickets for ${monthName} ${year}.`,
+      challengesAndRisks: projects.length
+        ? `Projects for ${monthName} ${year}: ${projects.length} posted initiative(s), ${activeProjects.length} active, ${completedMilestones} completed milestone(s).`
+        : `No posted projects for ${monthName} ${year}.`,
+      recommendations:
+        openedTickets.length || overdueTickets.length
+          ? `Follow-up for ${monthName} ${year}: ${openedTickets.length} posted ticket(s) still open, ${overdueTickets.length} SLA breach(es). Close remaining posted work before the next period.`
+          : `Posted operations for ${monthName} ${year} closed on helpdesk with ${slaCompliancePercent}% SLA on resolved tickets.`,
+      nextMonthPriorities: training.length
+        ? `Training for ${monthName} ${year}: ${training.length} posted session(s) with ${totalParticipants} participant(s).`
+        : `No posted training for ${monthName} ${year}.`,
       status: 'Draft',
       version: 1,
       createdAt: new Date().toISOString(),

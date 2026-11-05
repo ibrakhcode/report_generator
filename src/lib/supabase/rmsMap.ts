@@ -476,7 +476,11 @@ export function reportToRow(item: MonthlyReportData, userId: string, companyId: 
         ticketsSummary: item.ticketsSummary,
         sapSummary: item.sapSummary,
         projectsSummary: item.projectsSummary,
-        trainingSummary: item.trainingSummary
+        trainingSummary: item.trainingSummary,
+        feedbackToken: item.feedbackToken,
+        feedbackRecipients: item.feedbackRecipients,
+        feedbackUnseen: item.feedbackUnseen,
+        feedbackComments: item.feedbackComments
       }
     },
     major_achievements: item.majorAchievements || '',
@@ -549,7 +553,11 @@ export function rowToReport(row: Record<string, unknown>): MonthlyReportData {
     updatedAt: text(row.updated_at),
     finalizedAt: text(row.finalized_at) || undefined,
     finalizedBy: text(row.finalized_by) || undefined,
-    selectedTemplateId: text(row.selected_template_id) || undefined
+    selectedTemplateId: text(row.selected_template_id) || undefined,
+    feedbackToken: snapshot.feedbackToken,
+    feedbackRecipients: snapshot.feedbackRecipients,
+    feedbackUnseen: snapshot.feedbackUnseen,
+    feedbackComments: snapshot.feedbackComments
   };
 }
 

@@ -32,7 +32,7 @@ import {
   isAssignedToIbrahim,
   isClosedTicket,
   isUnassignedTicket,
-  writeSeenAssignedIds
+  markTicketNoticeSeen
 } from '@/lib/assignedTickets';
 import { usePagedList } from '@/hooks/usePagedList';
 import { PageBar } from '@/components/System/PageBar';
@@ -101,10 +101,6 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
     setDevices(storage.getDeviceNames());
   }, [workspaceRevision, selectedMonth]);
 
-  useEffect(() => {
-    writeSeenAssignedIds(storage.getTickets().filter(isAssignedToIbrahim).map((ticket) => ticket.id));
-  }, [tickets]);
-
   const applyTicketFocus = useCallback((id: string) => {
     setFocusId(id);
     setDeskFilter('assigned');
@@ -116,6 +112,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
     setPriorityFilter('All');
     setSlaFilter('All');
     const found = storage.getTickets().find((ticket) => ticket.id === id) || null;
+    markTicketNoticeSeen(id);
     setViewingTicket(found);
   }, []);
 
@@ -214,10 +211,11 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
 
   const listed = useMemo(() => {
     if (!focusId) return filtered;
-    const first = filtered.filter((item) => item.id === focusId);
+    const focused = tickets.find((item) => item.id === focusId);
     const rest = filtered.filter((item) => item.id !== focusId);
-    return [...first, ...rest];
-  }, [filtered, focusId]);
+    if (focused) return [focused, ...rest];
+    return filtered;
+  }, [filtered, focusId, tickets]);
 
   const paged = usePagedList(
     listed,
@@ -274,17 +272,21 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
   };
 
   const handleOpenEdit = (tck: SupportTicket) => {
+    markTicketNoticeSeen(tck.id);
     setFormData(tck);
     setEditingTicket(tck);
     setIsModalOpen(true);
   };
 
-  const handleStatusChange = (ticket: SupportTicket, status: TicketStatus) => {
+  const handleStatusChange = async (ticket: SupportTicket, status: TicketStatus) => {
     storage.saveTicket({
       ...ticket,
       status,
       updatedAt: new Date().toISOString()
     });
+    setTickets(storage.getTickets());
+    await storage.waitForLastPersist();
+    await storage.waitForHelpdeskPush();
     setTickets(storage.getTickets());
   };
 
@@ -330,11 +332,21 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
 
   useAutoSave(autoSave && isModalOpen, formData, persistTicket);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     persistTicket();
+    const saved = await storage.waitForLastPersist();
+    await storage.waitForHelpdeskPush();
+    setTickets(storage.getTickets());
+    if (!saved) {
+      notify.error(
+        'Ticket is on this screen, but not in the database',
+        storage.getLastPersistError() || 'Check the server connection and try Save again.'
+      );
+      return;
+    }
     setIsModalOpen(false);
-    notify.success(editingTicket ? 'Ticket updated' : 'Ticket saved', 'The helpdesk record is in place.');
+    notify.success(editingTicket ? 'Ticket updated' : 'Ticket saved', 'Status is saved and sent to Help Desk.');
   };
 
   const dash = useMemo(() => {
@@ -589,7 +601,10 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                       <div className="flex items-center justify-end gap-1">
                         <PostToReportButton source="tickets" recordId={tck.id} />
                         <button
-                          onClick={() => setViewingTicket(tck)}
+                          onClick={() => {
+                            markTicketNoticeSeen(tck.id);
+                            setViewingTicket(tck);
+                          }}
                           className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
                           title="View ticket"
                         >

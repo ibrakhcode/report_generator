@@ -12,8 +12,6 @@ export const ALL_MODULE_IDS = [
   'training',
   'reports',
   'report-library',
-  'templates',
-  'sharing',
   'users',
   'settings',
   'audit',

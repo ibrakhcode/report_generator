@@ -22,7 +22,7 @@ export const MENU_GROUPS: MenuGroup[] = [
     id: 'reporting',
     name: 'Reporting',
     category: 'Reporting',
-    description: 'Monthly reports, report library, templates, and delivery',
+    description: 'Monthly reports and report library',
     iconName: 'FileText'
   }
 ];

@@ -163,13 +163,17 @@ class AuthService {
 
   public async restoreCloudSession(): Promise<User | null> {
     if (typeof window === 'undefined') return this.currentUser;
-    const remote = await fetch('/api/auth/me');
-    if (!remote.ok) return this.currentUser;
-    const payload = (await remote.json()) as { user?: User };
-    if (!payload.user) return this.currentUser;
-    storage.saveUser(payload.user);
-    this.startSession(payload.user);
-    return payload.user;
+    try {
+      const remote = await fetch('/api/auth/me');
+      if (!remote.ok) return this.currentUser;
+      const payload = (await remote.json()) as { user?: User };
+      if (!payload.user) return this.currentUser;
+      storage.saveUser(payload.user);
+      this.startSession(payload.user);
+      return payload.user;
+    } catch {
+      return this.currentUser;
+    }
   }
 
   public getRecoveryCodeForDisplay(): string | null {

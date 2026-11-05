@@ -2,6 +2,7 @@ import type { SupportTicket } from '@/types';
 
 export const ASSIGNED_TECHNICIAN_NAME = 'Ibrahim Msambwe';
 export const SEEN_ASSIGNED_TICKETS_KEY = 'hesu_seen_assigned_tickets';
+export const SEEN_OTHER_TICKETS_KEY = 'hesu_seen_other_tickets';
 
 export function isClosedTicket(ticket: SupportTicket) {
   return ticket.status === 'Closed' || ticket.status === 'Resolved';
@@ -46,8 +47,47 @@ export function openUnassignedTickets(tickets: SupportTicket[]) {
   return tickets.filter((ticket) => isUnassignedTicket(ticket) && ticket.status === 'Open');
 }
 
+export function isTakenByOtherAgent(ticket: SupportTicket) {
+  return !isClosedTicket(ticket) && !isUnassignedTicket(ticket) && !isAssignedToIbrahim(ticket);
+}
+
+export function takenByOtherAgentTickets(tickets: SupportTicket[]) {
+  return tickets.filter(isTakenByOtherAgent);
+}
+
+function readSeenOtherIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(SEEN_OTHER_TICKETS_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed) ? parsed.map((id) => String(id)) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function unseenTakenByOthers(tickets: SupportTicket[]) {
+  const seen = new Set(readSeenOtherIds());
+  return takenByOtherAgentTickets(tickets).filter((ticket) => !seen.has(ticket.id));
+}
+
 export function notificationBadgeCount(tickets: SupportTicket[]) {
-  return unseenAssignedTickets(tickets).length + openUnassignedTickets(tickets).length;
+  return (
+    unseenAssignedTickets(tickets).length +
+    openUnassignedTickets(tickets).length +
+    unseenTakenByOthers(tickets).length
+  );
+}
+
+export function markTicketNoticeSeen(id: string) {
+  writeSeenAssignedIds(Array.from(new Set([...readSeenAssignedIds(), id])));
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(
+      SEEN_OTHER_TICKETS_KEY,
+      JSON.stringify(Array.from(new Set([...readSeenOtherIds(), id])))
+    );
+  }
+  emitTicketNoticeChange();
 }
 
 export function markAssignedTicketsSeen(tickets: SupportTicket[]) {
