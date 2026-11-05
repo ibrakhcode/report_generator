@@ -11,13 +11,14 @@ import {
 } from '../lib/templateFileStore';
 
 export async function buildPptxBlob(report: MonthlyReportData, templateId?: string): Promise<Blob> {
-  const template: ReportTemplate = resolveTemplate(templateId);
-  let uploaded = template?.uploadedTemplateData || (template?.id ? await loadTemplateFile(template.id) : undefined);
-  if (
-    !uploaded &&
-    (template?.id === BUNDLED_DEFAULT_TEMPLATE_ID || template?.uploadedTemplateName === BUNDLED_DEFAULT_PPTX_NAME)
-  ) {
-    uploaded = await loadBundledDefaultPptx();
+  const template: ReportTemplate = resolveTemplate(templateId || BUNDLED_DEFAULT_TEMPLATE_ID);
+  const useBundled =
+    template?.id === BUNDLED_DEFAULT_TEMPLATE_ID || template?.uploadedTemplateName === BUNDLED_DEFAULT_PPTX_NAME;
+  let uploaded = useBundled
+    ? await loadBundledDefaultPptx()
+    : template?.uploadedTemplateData || (template?.id ? await loadTemplateFile(template.id) : undefined);
+  if (!uploaded && useBundled) {
+    uploaded = await loadTemplateFile(BUNDLED_DEFAULT_TEMPLATE_ID);
   }
   if (uploaded) {
     return fillPptxTemplate(uploaded, report);

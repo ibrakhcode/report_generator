@@ -102,15 +102,16 @@ export async function saveTemplateFile(
 }
 
 export async function loadTemplateFile(templateId: string): Promise<string | undefined> {
+  if (templateId === BUNDLED_DEFAULT_TEMPLATE_ID) {
+    const bundled = await loadBundledDefaultPptx();
+    if (bundled) return bundled;
+  }
   const local = await loadTemplateFileLocal(templateId).catch(() => undefined);
   if (local) return local;
   const remote = await loadTemplateFileRemote(templateId);
   if (remote) {
     await saveTemplateFileLocal(templateId, remote).catch(() => undefined);
     return remote;
-  }
-  if (templateId === BUNDLED_DEFAULT_TEMPLATE_ID) {
-    return loadBundledDefaultPptx();
   }
   return undefined;
 }

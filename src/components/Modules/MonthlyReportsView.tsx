@@ -11,6 +11,7 @@ import { ReportDocumentPreview } from '@/components/Reports/ReportDocumentPrevie
 import { SharingView } from '@/components/Modules/SharingView';
 import { notify } from '@/lib/systemNotify';
 import { monthLabel, sourcePostStatus, unpostedReportSources } from '@/lib/reportPosts';
+import { BUNDLED_DEFAULT_TEMPLATE_ID } from '@/lib/templateFileStore';
 
 interface MonthlyReportsViewProps {
   selectedMonth: string;
@@ -32,11 +33,7 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({ selected
   const [progressLabel, setProgressLabel] = useState('Starting');
   const postStatus = sourcePostStatus(selectedMonth);
   const generated = report.month === selectedMonth && report.status === 'Finalized';
-  const templateId =
-    report.selectedTemplateId ||
-    storage.getTemplates().find((item) => item.isDefault)?.id ||
-    storage.getTemplates()[0]?.id ||
-    '';
+  const templateId = BUNDLED_DEFAULT_TEMPLATE_ID;
 
   useEffect(() => {
     setReport(storage.getDeliveryReport(selectedMonth));

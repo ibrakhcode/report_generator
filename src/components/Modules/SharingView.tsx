@@ -6,7 +6,7 @@ import { storage } from '../../services/storage';
 import { buildPdfBlob } from '../../services/pdfGenerator';
 import { buildPptxBlob } from '../../services/pptxGenerator';
 import { downloadBlob } from '../../lib/reportTokens';
-import { buildUnsentOutlookEml } from '@/lib/outlookDraftEml';
+import { BUNDLED_DEFAULT_TEMPLATE_ID } from '@/lib/templateFileStore';
 import { useAppSession } from '@/context/AppSessionContext';
 import { notify } from '@/lib/systemNotify';
 import { autoReportEmail, parseRecipientList } from '@/lib/reportFeedbackText';
@@ -34,11 +34,7 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
     [selectedMonth, workspaceRevision]
   );
   const settings = storage.getSettings();
-  const templateId =
-    report.selectedTemplateId ||
-    storage.getTemplates().find((item) => item.isDefault)?.id ||
-    storage.getTemplates()[0]?.id ||
-    '';
+  const templateId = BUNDLED_DEFAULT_TEMPLATE_ID;
   const defaultRecipient = settings.emailService.recipientEmail || settings.emailService.fromEmail || '';
   const [recipients, setRecipients] = useState<string[]>(
     report.feedbackRecipients?.length ? report.feedbackRecipients : defaultRecipient ? [defaultRecipient] : ['']
@@ -118,6 +114,7 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
     setIsSendingEmail(true);
     setEmailSentStatus(null);
     try {
+      const attachments = await buildAttachments();
       const res = await fetch('/api/share/email', {
         method: 'POST',
         credentials: 'include',
@@ -128,23 +125,11 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
           text: emailBody,
           reportId: report.id,
           month: selectedMonth,
-          composeOnly: true
+          attachments
         })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not prepare Outlook email.');
-      const bodyText = String(data.text || emailBody);
-      const attachments = await buildAttachments();
-      const eml = buildUnsentOutlookEml({
-        to: people,
-        subject: emailSubject,
-        text: bodyText,
-        attachments
-      });
-      downloadBlob(
-        new Blob([eml], { type: 'message/rfc822' }),
-        `ICT_Monthly_Report_${report.month}.eml`
-      );
+      if (!res.ok) throw new Error(data.error || 'Email send failed');
       const current = storage.getSettings();
       storage.saveSettings(
         {
@@ -158,11 +143,9 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
         feedbackToken: data.token,
         feedbackRecipients: people
       });
-      setEmailSentStatus(
-        `Draft ready for ${people.join(', ')} with the ${selectedMonth} report attached. Open the .eml file if Outlook did not start, then click Send.`
-      );
-      notify.success('Report attached', 'Open the Outlook draft and click Send.');
-      storage.logAudit('EMAIL_SENT', 'Delivery', undefined, `Opened Outlook for monthly report to ${people.join(', ')}`);
+      setEmailSentStatus(`Email sent to ${people.join(', ')} with the ${selectedMonth} report attached.`);
+      notify.success('Email sent', `Report for ${selectedMonth} delivered.`);
+      storage.logAudit('EMAIL_SENT', 'Delivery', undefined, `Sent monthly report email to ${people.join(', ')}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Could not send email.';
       setEmailSentStatus(message);
@@ -249,7 +232,7 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
           <Mail className="w-8 h-8 text-blue-400" />
           <div>
             <p className="text-lg font-black text-white">Share Report</p>
-            <p className="text-xs text-slate-400 mt-1">Open Outlook with the report already attached</p>
+            <p className="text-xs text-slate-400 mt-1">Send the attached IT Support report by email</p>
           </div>
         </button>
         <button
@@ -297,7 +280,7 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">Share to email</h3>
-              <p className="text-[11px] text-slate-400">Outlook opens a draft with To, message, and the report file(s) attached.</p>
+              <p className="text-[11px] text-slate-400">Sends like Feedback reply. The IT Support PPT/PDF is attached.</p>
             </div>
           </div>
 
@@ -388,7 +371,7 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
               className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl flex items-center justify-center gap-2"
             >
               <Send className="w-4 h-4" />
-              <span>{isSendingEmail ? 'Attaching report...' : 'Open in Outlook'}</span>
+              <span>{isSendingEmail ? 'Attaching report and sending...' : 'Send email'}</span>
             </button>
           </form>
             </div>

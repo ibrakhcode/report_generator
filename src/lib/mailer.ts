@@ -273,7 +273,7 @@ export async function sendAppEmail(input: {
 
   const config = resolvedMailConfig(await companyMailConfig(input.session));
   const provider = config.provider.toLowerCase();
-  const useGraph = provider === 'microsoftgraph' || Boolean(config.microsoftRefreshToken);
+  const useGraph = provider === 'microsoftgraph';
   const useSmtp =
     Boolean(config.host) && !useGraph && provider !== 'resend' && provider !== 'sendgrid';
   try {
