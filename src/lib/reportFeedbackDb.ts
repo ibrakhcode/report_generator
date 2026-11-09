@@ -37,6 +37,8 @@ export async function writeReportFeedback(
       ...(included.snapshot || {}),
       feedbackToken: report.feedbackToken,
       feedbackRecipients: report.feedbackRecipients || [],
+      feedbackCc: report.feedbackCc || [],
+      feedbackBcc: report.feedbackBcc || [],
       feedbackUnseen: report.feedbackUnseen || 0,
       feedbackComments: report.feedbackComments || []
     }

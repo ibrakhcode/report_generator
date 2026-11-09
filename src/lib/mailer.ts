@@ -107,6 +107,8 @@ function fromHeader(config: MailConfig) {
 
 type MailSend = {
   to: string | string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   text: string;
   html?: string;
@@ -133,6 +135,8 @@ async function sendWithResend(config: MailConfig, input: MailSend) {
     body: JSON.stringify({
       from,
       to: toList(input.to),
+      cc: input.cc?.length ? input.cc : undefined,
+      bcc: input.bcc?.length ? input.bcc : undefined,
       subject: input.subject,
       text: input.text,
       html: input.html,
@@ -166,7 +170,13 @@ async function sendWithSendGrid(config: MailConfig, input: MailSend) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      personalizations: [{ to: toList(input.to).map((email) => ({ email })) }],
+      personalizations: [
+        {
+          to: toList(input.to).map((email) => ({ email })),
+          ...(input.cc?.length ? { cc: input.cc.map((email) => ({ email })) } : {}),
+          ...(input.bcc?.length ? { bcc: input.bcc.map((email) => ({ email })) } : {})
+        }
+      ],
       from: { email: from, name: config.fromName || undefined },
       subject: input.subject,
       content: [
@@ -213,6 +223,8 @@ async function sendWithSmtp(config: MailConfig, input: MailSend) {
     await transporter.sendMail({
       from,
       to: toList(input.to).join(', '),
+      cc: (input.cc || []).join(', ') || undefined,
+      bcc: (input.bcc || []).join(', ') || undefined,
       subject: input.subject,
       text: input.text,
       html: input.html,
@@ -260,6 +272,8 @@ export async function sendPasswordResetEmail(email: string): Promise<{ ok: boole
 
 export async function sendAppEmail(input: {
   to: string | string[];
+  cc?: string | string[];
+  bcc?: string | string[];
   subject: string;
   text: string;
   html?: string;
@@ -270,6 +284,8 @@ export async function sendAppEmail(input: {
   if (!to.length) {
     return { ok: false, error: 'A valid recipient email is required.' };
   }
+  const cc = toList(input.cc || []).filter((item) => !to.includes(item));
+  const bcc = toList(input.bcc || []).filter((item) => !to.includes(item) && !cc.includes(item));
 
   const config = resolvedMailConfig(await companyMailConfig(input.session));
   const provider = config.provider.toLowerCase();
@@ -300,6 +316,8 @@ export async function sendAppEmail(input: {
       await sendMicrosoftMail({
         accessToken: access,
         to,
+        cc,
+        bcc,
         subject: input.subject,
         text: input.text,
         html: input.html,
@@ -308,7 +326,7 @@ export async function sendAppEmail(input: {
       return { ok: true, channel: 'microsoft-graph' };
     }
     if (useSmtp) {
-      const smtp = await sendWithSmtp(config, { ...input, to });
+      const smtp = await sendWithSmtp(config, { ...input, to, cc, bcc });
       if (smtp) return smtp;
       return {
         ok: false,
@@ -317,10 +335,10 @@ export async function sendAppEmail(input: {
       };
     }
     if (config.provider.toLowerCase() === 'sendgrid') {
-      const sendgrid = await sendWithSendGrid(config, { ...input, to });
+      const sendgrid = await sendWithSendGrid(config, { ...input, to, cc, bcc });
       if (sendgrid) return sendgrid;
     } else {
-      const resend = await sendWithResend(config, { ...input, to });
+      const resend = await sendWithResend(config, { ...input, to, cc, bcc });
       if (resend) return resend;
     }
   } catch (error) {
@@ -336,4 +354,9 @@ export async function sendAppEmail(input: {
 export async function defaultDeliveryRecipient(session?: RmsSession | null) {
   const config = resolvedMailConfig(await companyMailConfig(session));
   return config.recipientEmail;
+}
+
+export async function companySenderEmail(session?: RmsSession | null) {
+  const config = resolvedMailConfig(await companyMailConfig(session));
+  return config.fromEmail;
 }

@@ -5,14 +5,18 @@ import { Bell } from 'lucide-react';
 import { storage } from '@/services/storage';
 import { notify } from '@/lib/systemNotify';
 import {
-  markAssignedTicketsSeen,
+  markAllTicketNoticesSeen,
   markTicketNoticeSeen,
   notificationBadgeCount,
   openAssignedTickets,
   openUnassignedTickets,
+  refreshTicketNotices,
   requestTicketFocus,
+  scheduleTicketNoticeRefresh,
+  takenByOtherAgentTickets,
   unseenAssignedTickets,
   unseenTakenByOthers,
+  unseenUnassignedTickets,
   isClosedTicket,
   ASSIGNED_TECHNICIAN_NAME,
   TICKET_NOTICE_EVENT
@@ -31,7 +35,18 @@ export function TicketNoticePanel({ onOpenTickets }: { onOpenTickets: () => void
   const [tickets, setTickets] = useState<SupportTicket[]>(() => storage.getTickets());
   const [noticeRev, setNoticeRev] = useState(0);
   const [pickingId, setPickingId] = useState<string | null>(null);
+  const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void refreshTicketNotices();
+    const timer = window.setInterval(() => void refreshTicketNotices(), 30000);
+    const unsub = storage.subscribe(scheduleTicketNoticeRefresh);
+    return () => {
+      window.clearInterval(timer);
+      unsub();
+    };
+  }, []);
 
   useEffect(() => {
     const refresh = () => {
@@ -58,14 +73,27 @@ export function TicketNoticePanel({ onOpenTickets }: { onOpenTickets: () => void
 
   const assigned = openAssignedTickets(tickets);
   const unassigned = openUnassignedTickets(tickets);
-  const unseen = unseenAssignedTickets(tickets);
-  const unseenOthers = unseenTakenByOthers(tickets);
-  const unseenIds = new Set(unseen.map((ticket) => ticket.id));
   void noticeRev;
+  const unseenIds = newIds;
+  const unseenAssignedCount = assigned.filter((ticket) => newIds.has(ticket.id)).length;
+  const unseenOthers = takenByOtherAgentTickets(tickets).filter((ticket) => newIds.has(ticket.id));
   const slaCount = tickets.filter((item) => item.slaBreached && !isClosedTicket(item)).length;
   const missingPosts = unpostedReportSources(selectedMonth);
   const remainingPosts = remainingUnpostedCount(selectedMonth);
-  const badge = notificationBadgeCount(tickets) + remainingPosts;
+  const badge = notificationBadgeCount(tickets);
+
+  const toggleOpen = () => {
+    if (!open) {
+      const fresh = [
+        ...unseenAssignedTickets(tickets),
+        ...unseenUnassignedTickets(tickets),
+        ...unseenTakenByOthers(tickets)
+      ];
+      setNewIds(new Set(fresh.map((ticket) => ticket.id)));
+      if (fresh.length) markAllTicketNoticesSeen();
+    }
+    setOpen(!open);
+  };
 
   const pickTicket = async (ticket: SupportTicket) => {
     setPickingId(ticket.id);
@@ -101,6 +129,7 @@ export function TicketNoticePanel({ onOpenTickets }: { onOpenTickets: () => void
         updatedAt: new Date().toISOString()
       });
       setTickets(storage.getTickets());
+      markTicketNoticeSeen(ticket.id);
       notify.success('Your picked ticket is this', ticket.title);
       setOpen(false);
       requestTicketFocus(ticket.id);
@@ -116,7 +145,7 @@ export function TicketNoticePanel({ onOpenTickets }: { onOpenTickets: () => void
     <div className="relative" ref={boxRef}>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={toggleOpen}
         className="relative p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800"
         aria-label="Ticket notifications"
       >
@@ -131,22 +160,12 @@ export function TicketNoticePanel({ onOpenTickets }: { onOpenTickets: () => void
         <div className="absolute right-0 mt-2 w-[22rem] max-w-[90vw] rounded-xl border border-slate-700 bg-slate-900 shadow-xl z-50">
           <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800">
             <p className="text-[11px] uppercase tracking-wide text-slate-400 font-semibold">Notifications</p>
-            <button
-              type="button"
-              onClick={() => {
-                markAssignedTicketsSeen(tickets);
-                setTickets([...storage.getTickets()]);
-              }}
-              className="text-[10px] text-teal-400 hover:text-teal-300 font-semibold"
-            >
-              Mark assigned as seen
-            </button>
           </div>
 
           <div className="max-h-[70vh] overflow-y-auto">
             <div className="grid grid-cols-3 gap-1 px-3 pt-2">
               {[
-                { label: 'Assigned', value: unseen.length, color: 'text-amber-300' },
+                { label: 'Assigned', value: unseenAssignedCount, color: 'text-amber-300' },
                 { label: 'Unassigned', value: unassigned.length, color: 'text-red-400' },
                 { label: 'SLA', value: slaCount, color: 'text-white' }
               ].map((item) => (

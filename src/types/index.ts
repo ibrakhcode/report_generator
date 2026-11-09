@@ -267,6 +267,8 @@ export interface MonthlyReportData {
   selectedTemplateId?: string;
   feedbackToken?: string;
   feedbackRecipients?: string[];
+  feedbackCc?: string[];
+  feedbackBcc?: string[];
   feedbackUnseen?: number;
   feedbackComments?: ReportFeedbackComment[];
 }

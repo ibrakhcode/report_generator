@@ -27,6 +27,58 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
+function OptionalRecipients({
+  label,
+  values,
+  onChange,
+  addLabel
+}: {
+  label: string;
+  values: string[];
+  onChange: (next: string[]) => void;
+  addLabel: string;
+}) {
+  return (
+    <div>
+      <label className="block text-slate-400 font-semibold mb-1">{label}</label>
+      {values.length ? (
+        <div className="space-y-2">
+          {values.map((item, index) => (
+            <div key={index} className="flex gap-2">
+              <input
+                type="email"
+                value={item}
+                placeholder={`${label} email`}
+                onChange={(e) => {
+                  const next = values.slice();
+                  next[index] = e.target.value;
+                  onChange(next);
+                }}
+                className="w-full px-3 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-white"
+              />
+              <button
+                type="button"
+                onClick={() => onChange(values.filter((_, i) => i !== index))}
+                className="px-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => onChange([...values, ''])}
+        className="mt-2 inline-flex items-center gap-1 text-teal-300 font-semibold"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        {addLabel}
+      </button>
+    </div>
+  );
+}
+
 export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
   const { workspaceRevision } = useAppSession();
   const report = useMemo(
@@ -39,6 +91,8 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
   const [recipients, setRecipients] = useState<string[]>(
     report.feedbackRecipients?.length ? report.feedbackRecipients : defaultRecipient ? [defaultRecipient] : ['']
   );
+  const [ccList, setCcList] = useState<string[]>(report.feedbackCc || []);
+  const [bccList, setBccList] = useState<string[]>(report.feedbackBcc || []);
   const [emailSubject, setEmailSubject] = useState(autoReportEmail(selectedMonth, '').subject);
   const [emailBody, setEmailBody] = useState(autoReportEmail(selectedMonth, '[Feedback link will be added when you send]').text);
   const [emailSentStatus, setEmailSentStatus] = useState<string | null>(null);
@@ -57,6 +111,8 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
     setComments(report.feedbackComments || []);
     setUnseen(report.feedbackUnseen || 0);
     if (report.feedbackRecipients?.length) setRecipients(report.feedbackRecipients);
+    if (report.feedbackCc?.length) setCcList(report.feedbackCc);
+    if (report.feedbackBcc?.length) setBccList(report.feedbackBcc);
   }, [report, selectedMonth]);
 
   useEffect(() => {
@@ -121,6 +177,8 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: people,
+          cc: parseRecipientList(ccList.join(',')),
+          bcc: parseRecipientList(bccList.join(',')),
           subject: emailSubject,
           text: emailBody,
           reportId: report.id,
@@ -141,7 +199,9 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
       storage.saveReport({
         ...storage.getDeliveryReport(selectedMonth),
         feedbackToken: data.token,
-        feedbackRecipients: people
+        feedbackRecipients: people,
+        feedbackCc: data.cc || [],
+        feedbackBcc: data.bcc || []
       });
       setEmailSentStatus(`Email sent to ${people.join(', ')} with the ${selectedMonth} report attached.`);
       notify.success('Email sent', `Report for ${selectedMonth} delivered.`);
@@ -200,7 +260,11 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
       feedbackComments: data.comments || [],
       feedbackUnseen: 0
     });
-    notify.success('Comment sent', 'Your reply was emailed to the recipients.');
+    if (data.emailed) {
+      notify.success('Comment sent', 'Your reply was emailed to the recipients.');
+    } else {
+      notify.error('Reply saved, email not sent', data.emailError || 'Could not email the recipients.');
+    }
   };
 
   const openFeedback = () => {
@@ -333,8 +397,10 @@ export const SharingView: React.FC<SharingViewProps> = ({ selectedMonth }) => {
                 Add another person
               </button>
             </div>
+            <OptionalRecipients label="CC" values={ccList} onChange={setCcList} addLabel="Add CC" />
+            <OptionalRecipients label="BCC" values={bccList} onChange={setBccList} addLabel="Add BCC" />
             <div>
-              <label className="block text-slate-400 font-semibold mb-1">Message (auto generated)</label>
+              <label className="block text-slate-400 font-semibold mb-1">Message (you can edit)</label>
               <textarea
                 rows={10}
                 value={emailBody}

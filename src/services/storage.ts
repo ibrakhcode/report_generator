@@ -1550,6 +1550,8 @@ class StorageService {
       createdAt: saved?.createdAt || live.createdAt,
       feedbackToken: saved?.feedbackToken,
       feedbackRecipients: saved?.feedbackRecipients,
+      feedbackCc: saved?.feedbackCc,
+      feedbackBcc: saved?.feedbackBcc,
       feedbackUnseen: saved?.feedbackUnseen,
       feedbackComments: saved?.feedbackComments
     };
@@ -1578,6 +1580,8 @@ class StorageService {
       version: saved?.version || live.version,
       feedbackToken: saved?.feedbackToken,
       feedbackRecipients: saved?.feedbackRecipients,
+      feedbackCc: saved?.feedbackCc,
+      feedbackBcc: saved?.feedbackBcc,
       feedbackUnseen: saved?.feedbackUnseen,
       feedbackComments: saved?.feedbackComments
     };

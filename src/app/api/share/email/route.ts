@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readRmsSession } from '@/lib/readRmsSession';
 import { sendAppEmail } from '@/lib/mailer';
 import { signFeedbackToken } from '@/lib/reportFeedback';
-import { autoReportEmail, parseRecipientList } from '@/lib/reportFeedbackText';
+import { autoReportEmail, parseRecipientList, reportEmailHtml } from '@/lib/reportFeedbackText';
 import { readReportForFeedback, writeReportFeedback } from '@/lib/reportFeedbackDb';
 
 export async function POST(req: NextRequest) {
@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
 
   let body: {
     to?: string | string[];
+    cc?: string | string[];
+    bcc?: string | string[];
     subject?: string;
     text?: string;
     html?: string;
@@ -27,7 +29,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid request.' }, { status: 400 });
   }
 
-  const recipients = parseRecipientList(Array.isArray(body.to) ? body.to.join(',') : String(body.to || ''));
+  const listOf = (value?: string | string[]) =>
+    parseRecipientList(Array.isArray(value) ? value.join(',') : String(value || ''));
+  const recipients = listOf(body.to);
+  const cc = listOf(body.cc).filter((item) => !recipients.includes(item));
+  const bcc = listOf(body.bcc).filter((item) => !recipients.includes(item) && !cc.includes(item));
   if (!recipients.length || !body.subject) {
     return NextResponse.json({ ok: false, error: 'Recipient and subject are required.' }, { status: 400 });
   }
@@ -43,12 +49,14 @@ export async function POST(req: NextRequest) {
   const feedbackUrl = `${origin}/feedback/${encodeURIComponent(token)}`;
   const generated = autoReportEmail(month || 'this month', feedbackUrl);
   const text = (body.text?.trim() || generated.text).replace('[Feedback link will be added when you send]', feedbackUrl);
-  const html = generated.html;
+  const html = reportEmailHtml(text, feedbackUrl, month || 'this month');
 
   let channel = 'outlook';
   if (!composeOnly) {
     const mailed = await sendAppEmail({
       to: recipients,
+      cc,
+      bcc,
       subject: body.subject,
       text,
       html,
@@ -68,6 +76,8 @@ export async function POST(req: NextRequest) {
         ...existing,
         feedbackToken: token,
         feedbackRecipients: recipients,
+        feedbackCc: cc,
+        feedbackBcc: bcc,
         feedbackUnseen: existing.feedbackUnseen || 0,
         feedbackComments: existing.feedbackComments || []
       },
@@ -75,5 +85,5 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, channel, token, feedbackUrl, recipients, text });
+  return NextResponse.json({ ok: true, channel, token, feedbackUrl, recipients, cc, bcc, text });
 }

@@ -72,7 +72,7 @@ export const TrainingView: React.FC = () => {
     if (!formData.title) return;
 
     const toSave: TrainingRecord = {
-      id: formData.id || `TRN-2026-${String(trainings.length + 1).padStart(2, '0')}`,
+      id: formData.id || `TRN-${Date.now()}`,
       title: formData.title || '',
       date: formData.date || new Date().toISOString().split('T')[0],
       topic: formData.topic || formData.title || '',

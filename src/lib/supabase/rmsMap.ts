@@ -479,6 +479,8 @@ export function reportToRow(item: MonthlyReportData, userId: string, companyId: 
         trainingSummary: item.trainingSummary,
         feedbackToken: item.feedbackToken,
         feedbackRecipients: item.feedbackRecipients,
+        feedbackCc: item.feedbackCc,
+        feedbackBcc: item.feedbackBcc,
         feedbackUnseen: item.feedbackUnseen,
         feedbackComments: item.feedbackComments
       }
@@ -556,6 +558,8 @@ export function rowToReport(row: Record<string, unknown>): MonthlyReportData {
     selectedTemplateId: text(row.selected_template_id) || undefined,
     feedbackToken: snapshot.feedbackToken,
     feedbackRecipients: snapshot.feedbackRecipients,
+    feedbackCc: snapshot.feedbackCc,
+    feedbackBcc: snapshot.feedbackBcc,
     feedbackUnseen: snapshot.feedbackUnseen,
     feedbackComments: snapshot.feedbackComments
   };

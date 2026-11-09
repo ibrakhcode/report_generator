@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readRmsSession } from '@/lib/readRmsSession';
-import { sendAppEmail } from '@/lib/mailer';
+import { companySenderEmail, sendAppEmail } from '@/lib/mailer';
 import { readFeedbackToken } from '@/lib/reportFeedback';
+import { escapeHtml } from '@/lib/reportFeedbackText';
 import { addComment, readReportForFeedback, writeReportFeedback } from '@/lib/reportFeedbackDb';
 import { monthLabel } from '@/lib/reportPosts';
 
@@ -65,18 +66,44 @@ export async function POST(req: NextRequest) {
   if (isReply) next.feedbackUnseen = 0;
   await writeReportFeedback(next, payload.ownerUserId);
 
+  let emailed = false;
+  let emailError = '';
   if (isReply) {
     const to = report.feedbackRecipients?.length ? report.feedbackRecipients : [comment.email].filter(Boolean);
     if (to.length) {
-      await sendAppEmail({
+      const mailed = await sendAppEmail({
         to,
+        cc: report.feedbackCc || [],
         subject: `Re: ICT Monthly Report — ${monthLabel(report.month)}`,
         text: `Ibrahim replied on the ${monthLabel(report.month)} report:\n\n${message}`,
-        html: `<p>Ibrahim replied on the ${monthLabel(report.month)} report:</p><p>${message.replace(/</g, '&lt;')}</p>`,
+        html: `<p>Ibrahim replied on the ${monthLabel(report.month)} report:</p><p>${escapeHtml(message).replace(/\n/g, '<br/>')}</p>`,
         session
+      });
+      emailed = mailed.ok;
+      if (!mailed.ok) emailError = mailed.error || 'Could not send email.';
+    } else {
+      emailError = 'No recipient email saved on this report.';
+    }
+  } else {
+    const owner = { userId: payload.ownerUserId, email: '', companyId: '' };
+    const notifyTo = await companySenderEmail(owner);
+    if (notifyTo) {
+      const who = comment.email ? `${comment.author} (${comment.email})` : comment.author;
+      await sendAppEmail({
+        to: notifyTo,
+        subject: `New feedback — ICT Monthly Report ${monthLabel(report.month)}`,
+        text: `${who} commented on the ${monthLabel(report.month)} report:\n\n${message}\n\nOpen RMS > Report Delivery > Feedback to reply.`,
+        html: `<p>${escapeHtml(who)} commented on the ${monthLabel(report.month)} report:</p><p>${escapeHtml(message).replace(/\n/g, '<br/>')}</p><p>Open RMS &gt; Report Delivery &gt; Feedback to reply.</p>`,
+        session: owner
       });
     }
   }
 
-  return NextResponse.json({ ok: true, comments: next.feedbackComments || [], unseen: next.feedbackUnseen || 0 });
+  return NextResponse.json({
+    ok: true,
+    comments: next.feedbackComments || [],
+    unseen: next.feedbackUnseen || 0,
+    emailed,
+    emailError
+  });
 }

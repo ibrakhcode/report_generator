@@ -34,9 +34,59 @@ export function writeSeenAssignedIds(ids: string[]) {
   window.localStorage.setItem(SEEN_ASSIGNED_TICKETS_KEY, JSON.stringify(ids));
 }
 
+export type NoticeKind = 'assigned' | 'unassigned' | 'other';
+const NOTICE_KINDS: NoticeKind[] = ['assigned', 'unassigned', 'other'];
+let unseenState: Record<NoticeKind, Set<string>> = { assigned: new Set(), unassigned: new Set(), other: new Set() };
+let refreshing: Promise<void> | null = null;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+export async function refreshTicketNotices() {
+  if (typeof window === 'undefined') return;
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    try {
+      const response = await fetch('/api/rms/notifications', { credentials: 'include', cache: 'no-store' });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        unseen?: Record<NoticeKind, string[]>;
+      };
+      if (response.ok && payload.ok && payload.unseen) {
+        unseenState = {
+          assigned: new Set(payload.unseen.assigned || []),
+          unassigned: new Set(payload.unseen.unassigned || []),
+          other: new Set(payload.unseen.other || [])
+        };
+        emitTicketNoticeChange();
+      }
+    } catch {
+      // keep the last known state when the server is unreachable
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+
+export function scheduleTicketNoticeRefresh() {
+  if (typeof window === 'undefined') return;
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => void refreshTicketNotices(), 1500);
+}
+
+function saveNoticeReads(keys: string[]) {
+  if (!keys.length || typeof window === 'undefined') return;
+  void fetch('/api/rms/notifications', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys })
+  }).catch(() => undefined);
+}
+
 export function unseenAssignedTickets(tickets: SupportTicket[]) {
-  const seen = new Set(readSeenAssignedIds());
-  return tickets.filter((ticket) => isAssignedToIbrahim(ticket) && !isClosedTicket(ticket) && !seen.has(ticket.id));
+  return tickets.filter(
+    (ticket) => unseenState.assigned.has(ticket.id) && isAssignedToIbrahim(ticket) && !isClosedTicket(ticket)
+  );
 }
 
 export function openAssignedTickets(tickets: SupportTicket[]) {
@@ -45,6 +95,10 @@ export function openAssignedTickets(tickets: SupportTicket[]) {
 
 export function openUnassignedTickets(tickets: SupportTicket[]) {
   return tickets.filter((ticket) => isUnassignedTicket(ticket) && ticket.status === 'Open');
+}
+
+export function unseenUnassignedTickets(tickets: SupportTicket[]) {
+  return openUnassignedTickets(tickets).filter((ticket) => unseenState.unassigned.has(ticket.id));
 }
 
 export function isTakenByOtherAgent(ticket: SupportTicket) {
@@ -67,14 +121,13 @@ function readSeenOtherIds(): string[] {
 }
 
 export function unseenTakenByOthers(tickets: SupportTicket[]) {
-  const seen = new Set(readSeenOtherIds());
-  return takenByOtherAgentTickets(tickets).filter((ticket) => !seen.has(ticket.id));
+  return takenByOtherAgentTickets(tickets).filter((ticket) => unseenState.other.has(ticket.id));
 }
 
 export function notificationBadgeCount(tickets: SupportTicket[]) {
   return (
     unseenAssignedTickets(tickets).length +
-    openUnassignedTickets(tickets).length +
+    unseenUnassignedTickets(tickets).length +
     unseenTakenByOthers(tickets).length
   );
 }
@@ -87,6 +140,17 @@ export function markTicketNoticeSeen(id: string) {
       JSON.stringify(Array.from(new Set([...readSeenOtherIds(), id])))
     );
   }
+  NOTICE_KINDS.forEach((kind) => unseenState[kind].delete(id));
+  saveNoticeReads(NOTICE_KINDS.map((kind) => `ticket:${id}:${kind}`));
+  emitTicketNoticeChange();
+}
+
+export function markAllTicketNoticesSeen() {
+  const keys = NOTICE_KINDS.flatMap((kind) =>
+    Array.from(unseenState[kind]).map((id) => `ticket:${id}:${kind}`)
+  );
+  unseenState = { assigned: new Set(), unassigned: new Set(), other: new Set() };
+  saveNoticeReads(keys);
   emitTicketNoticeChange();
 }
 

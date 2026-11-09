@@ -93,6 +93,8 @@ export async function microsoftProfile(accessToken: string) {
 export async function sendMicrosoftMail(input: {
   accessToken: string;
   to: string[];
+  cc?: string[];
+  bcc?: string[];
   subject: string;
   text: string;
   html?: string;
@@ -118,6 +120,8 @@ export async function sendMicrosoftMail(input: {
           content: input.html || input.text
         },
         toRecipients: input.to.map((address) => ({ emailAddress: { address } })),
+        ccRecipients: (input.cc || []).map((address) => ({ emailAddress: { address } })),
+        bccRecipients: (input.bcc || []).map((address) => ({ emailAddress: { address } })),
         attachments
       },
       saveToSentItems: true

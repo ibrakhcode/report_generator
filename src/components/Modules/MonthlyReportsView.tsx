@@ -94,6 +94,8 @@ export const MonthlyReportsView: React.FC<MonthlyReportsViewProps> = ({ selected
       selectedTemplateId: templateId,
       feedbackToken: existing?.feedbackToken,
       feedbackRecipients: existing?.feedbackRecipients,
+      feedbackCc: existing?.feedbackCc,
+      feedbackBcc: existing?.feedbackBcc,
       feedbackUnseen: existing?.feedbackUnseen,
       feedbackComments: existing?.feedbackComments
     };

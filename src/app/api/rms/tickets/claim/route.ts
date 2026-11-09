@@ -7,6 +7,7 @@ import {
   upsertAssignedTickets
 } from '@/lib/externalTicketIngest';
 import { claimHelpdeskTicket } from '@/lib/ticeketClient';
+import { notifyRequesterPicked } from '@/lib/ticketAlerts';
 import { activityToRow, rowToTicket, ticketToRow } from '@/lib/supabase/rmsMap';
 
 export async function POST(request: Request) {
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
     if (id.startsWith('TCK-EXT-')) {
       const claimed = await claimHelpdeskTicket(id);
       const pulled = await upsertAssignedTickets(supabase, { tickets: [claimed] });
-      return NextResponse.json({ ok: true, ...pulled });
+      const notified = await notifyRequesterPicked({ rmsTicketId: id, session }).catch(() => null);
+      return NextResponse.json({ ok: true, ...pulled, notified });
     }
 
     const existing = await supabase

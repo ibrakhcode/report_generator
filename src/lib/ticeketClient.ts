@@ -389,3 +389,32 @@ export async function pushHelpdeskTicketUpdate(input: {
   const ibrahimAssigned = Boolean(agentId && ibrahimIds.has(String(agentId)));
   return mapHelpdeskTicket(saved, undefined, agent, ibrahimAssigned);
 }
+
+export async function loadHelpdeskTicket(rmsTicketId: string) {
+  const client = ticeketSupabase();
+  if (!client) throw new Error('Help Desk is not configured.');
+  const row = await findHelpdeskTicketRow(client, rmsTicketId);
+  const ids = [row.customer_id, row.agent_id].filter(Boolean).map(String);
+  const people = ids.length
+    ? await client.from('profiles').select('id, full_name, email, username, role').in('id', ids)
+    : { data: [], error: null };
+  if (people.error) throw new Error(people.error.message);
+  const byId = new Map((people.data || []).map((person) => [String(person.id), person as Json]));
+  const customer = byId.get(String(row.customer_id || ''));
+  const agent = byId.get(String(row.agent_id || ''));
+  const ibrahimIds = new Set((await findIbrahimProfiles(client)).map((item) => String(item.id)));
+  const ibrahim = Boolean(row.agent_id) && (ibrahimIds.has(String(row.agent_id)) || isIbrahimAgent(agent));
+  return { row, customer, agent, ibrahim, mapped: mapHelpdeskTicket(row, customer, agent, ibrahim) };
+}
+
+export async function postHelpdeskMessage(rmsTicketId: string, message: string) {
+  const client = ticeketSupabase();
+  if (!client) throw new Error('Help Desk is not configured.');
+  const [row, agents] = await Promise.all([findHelpdeskTicketRow(client, rmsTicketId), findIbrahimProfiles(client)]);
+  const sender = agents[0];
+  if (!sender?.id) throw new Error('Ibrahim Help Desk profile was not found.');
+  const insert = await client
+    .from('ticket_messages')
+    .insert({ id: crypto.randomUUID(), ticket_id: row.id, sender_id: sender.id, message });
+  if (insert.error) throw new Error(insert.error.message);
+}
