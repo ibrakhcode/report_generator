@@ -25,6 +25,7 @@ import { draftTicketWriteup } from '@/lib/writeAssist';
 import { MultiPick, splitPicked } from '@/components/System/MultiPick';
 import { SuggestField } from '@/components/System/SuggestField';
 import { DetailRow, RecordDetailDialog } from '@/components/System/RecordDetailDialog';
+import { TicketChat } from '@/components/System/TicketChat';
 import { useAppSession } from '@/context/AppSessionContext';
 import {
   FOCUS_TICKET_EVENT,
@@ -665,7 +666,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                   <input
                     type="text"
                     required
-                    value={formData.requesterName}
+                    value={formData.requesterName || ''}
                     onChange={(e) => setFormData({ ...formData, requesterName: e.target.value })}
                     placeholder="e.g. David Mkapa"
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
@@ -685,7 +686,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                 <input
                   type="text"
                   required
-                  value={formData.title}
+                  value={formData.title || ''}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="e.g. Zebra Label Printer Thermal Roller Jam in Dispatch Room"
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
@@ -706,7 +707,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                 </div>
                 <textarea
                   rows={2}
-                  value={formData.description}
+                  value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="What happened, who is affected, and why it matters to the company..."
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
@@ -750,7 +751,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                 <label className="block text-slate-400 font-semibold mb-1">Actions Taken & Technical Resolution</label>
                 <textarea
                   rows={2}
-                  value={formData.actionsTaken}
+                  value={formData.actionsTaken || ''}
                   onChange={(e) => setFormData({ ...formData, actionsTaken: e.target.value })}
                   placeholder="Steps taken to diagnose and resolve..."
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
@@ -761,7 +762,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
                 <label className="block text-slate-400 font-semibold mb-1">Root Cause (When identified)</label>
                 <input
                   type="text"
-                  value={formData.rootCause}
+                  value={formData.rootCause || ''}
                   onChange={(e) => setFormData({ ...formData, rootCause: e.target.value })}
                   placeholder="e.g. Adhesive buildup on roller; obsolete DNS cache"
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-blue-500"
@@ -808,6 +809,7 @@ export const TicketsView: React.FC<TicketsViewProps> = ({ selectedMonth }) => {
           <DetailRow label="Assets / systems" value={viewingTicket.applicationOrDevice} />
           <DetailRow label="Actions taken" value={viewingTicket.actionsTaken} />
           <DetailRow label="Root cause" value={viewingTicket.rootCause} />
+          {viewingTicket.id.startsWith('TCK-EXT-') ? <TicketChat ticketId={viewingTicket.id} /> : null}
         </RecordDetailDialog>
       )}
     </div>

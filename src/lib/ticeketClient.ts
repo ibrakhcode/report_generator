@@ -407,6 +407,38 @@ export async function loadHelpdeskTicket(rmsTicketId: string) {
   return { row, customer, agent, ibrahim, mapped: mapHelpdeskTicket(row, customer, agent, ibrahim) };
 }
 
+export async function listHelpdeskMessages(rmsTicketId: string) {
+  const client = ticeketSupabase();
+  if (!client) throw new Error('Help Desk is not configured.');
+  const row = await findHelpdeskTicketRow(client, rmsTicketId);
+  const messages = await client
+    .from('ticket_messages')
+    .select('id, sender_id, message, created_at')
+    .eq('ticket_id', row.id)
+    .order('created_at', { ascending: true })
+    .limit(200);
+  if (messages.error) throw new Error(messages.error.message);
+  const senderIds = [
+    ...new Set((messages.data || []).map((item) => String(item.sender_id || '')).filter(Boolean))
+  ];
+  const people = senderIds.length
+    ? await client.from('profiles').select('id, full_name, username, email, role').in('id', senderIds)
+    : { data: [], error: null };
+  if (people.error) throw new Error(people.error.message);
+  const byId = new Map((people.data || []).map((person) => [String(person.id), person as Json]));
+  const ibrahimIds = new Set((await findIbrahimProfiles(client)).map((item) => String(item.id)));
+  return (messages.data || []).map((item) => {
+    const sender = byId.get(String(item.sender_id || ''));
+    return {
+      id: String(item.id),
+      sender: String(sender?.full_name || sender?.username || 'Help Desk user'),
+      mine: ibrahimIds.has(String(item.sender_id || '')),
+      message: String(item.message || ''),
+      createdAt: String(item.created_at || '')
+    };
+  });
+}
+
 export async function postHelpdeskMessage(rmsTicketId: string, message: string) {
   const client = ticeketSupabase();
   if (!client) throw new Error('Help Desk is not configured.');
