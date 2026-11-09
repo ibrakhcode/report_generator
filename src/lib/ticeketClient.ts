@@ -387,7 +387,7 @@ export async function pushHelpdeskTicketUpdate(input: {
   const saved = ((updated.data?.[0] || { ...row, ...patch }) as Json);
   const agent = agentId ? ((await client.from('profiles').select('id, full_name, email, username, role').eq('id', agentId).limit(1)).data?.[0] as Json | undefined) : undefined;
   const ibrahimAssigned = Boolean(agentId && ibrahimIds.has(String(agentId)));
-  return mapHelpdeskTicket(saved, undefined, agent, ibrahimAssigned);
+  return { ...mapHelpdeskTicket(saved, undefined, agent, ibrahimAssigned), _previousStatus: String(row.status || '') };
 }
 
 export async function loadHelpdeskTicket(rmsTicketId: string) {

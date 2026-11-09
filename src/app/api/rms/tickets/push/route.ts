@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { readRmsSession } from '@/lib/readRmsSession';
 import { pushHelpdeskTicketUpdate } from '@/lib/ticeketClient';
+import { notifyRequesterClosed } from '@/lib/ticketAlerts';
 
 export async function POST(request: Request) {
   const session = await readRmsSession();
@@ -27,7 +28,10 @@ export async function POST(request: Request) {
       status,
       assignedTechnician: body.assignedTechnician
     });
-    return NextResponse.json({ ok: true, ticket });
+    const closedNow =
+      status.toLowerCase() === 'closed' && String(ticket._previousStatus || '').toLowerCase() !== 'closed';
+    const notified = closedNow ? await notifyRequesterClosed({ rmsTicketId: id, session }).catch(() => null) : null;
+    return NextResponse.json({ ok: true, ticket, notified });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not update Help Desk.';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

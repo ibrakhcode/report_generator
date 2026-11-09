@@ -8,7 +8,7 @@ import type { RmsSession } from '@/lib/rmsSession';
 type Json = Record<string, unknown>;
 
 export const PICKED_MESSAGE =
-  'This ticket is picked up by Ibrahim Agent. He is now with your ticket. Thank you, we have received your ticket. He will either come or call you soon.';
+  'This ticket is picked up by Ibrahim Assistant Agent. He is now with your ticket. Thank you, we have received your ticket. He will either come or call you soon.';
 
 function alertEmail() {
   return (process.env.TICKET_INGEST_ASSIGNEE_EMAIL || DEFAULT_TICKET_ASSIGNEE_EMAIL).trim();
@@ -88,6 +88,30 @@ export async function notifyRequesterPicked(input: { rmsTicketId: string; sessio
     subject: `Your ticket #${number} is assigned to Ibrahim`,
     text: `${name ? `Dear ${name},\n\n` : ''}${PICKED_MESSAGE}\n\nTicket #${number}: ${String(row.subject || '')}\n\nThank you for your patience.\nHESU ICT Help Desk`,
     html,
+    session: input.session
+  });
+  return { chat, mail };
+}
+
+export function closedMessage(number: string) {
+  return `Ticket number TKT-${number} has been closed by Ibrahim Assistant Agent.`;
+}
+
+export async function notifyRequesterClosed(input: { rmsTicketId: string; session: RmsSession | null }) {
+  const { row, customer } = await loadHelpdeskTicket(input.rmsTicketId);
+  const number = String(row.ticket_number || row.id);
+  const message = closedMessage(number);
+  const chat = await postHelpdeskMessage(input.rmsTicketId, message).then(
+    () => ({ ok: true }),
+    (error: unknown) => ({ ok: false, error: error instanceof Error ? error.message : 'Chat message failed.' })
+  );
+  const requester = String(customer?.email || '').trim();
+  const mail = await sendAppEmail({
+    to: requester || alertEmail(),
+    cc: requester ? [alertEmail()] : undefined,
+    subject: `Ticket TKT-${number} has been closed`,
+    text: message,
+    html: `<p style="font-family:Arial,sans-serif;font-size:15px">${escapeHtml(message)}</p>`,
     session: input.session
   });
   return { chat, mail };
